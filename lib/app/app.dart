@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import '../features/idcard/id_result_page.dart';
 import '../features/registration/registration_page.dart';
 import '../features/splash/splash_page.dart';
+import '../services/biometric_service.dart';
 import '../services/card_link.dart';
 import '../services/id_record_store.dart';
 import '../shared/widgets/brand_widgets.dart';
@@ -19,6 +20,7 @@ class ADigitalIdApp extends StatefulWidget {
     super.key,
     this.storeOpener,
     this.enableDeepLinks = true,
+    this.biometricService,
   });
 
   /// Overridable store factory for tests; defaults to [IdRecordStore.open].
@@ -27,6 +29,9 @@ class ADigitalIdApp extends StatefulWidget {
   /// Listening for `adigitalid://card?…` links needs a platform channel, so
   /// widget tests switch it off.
   final bool enableDeepLinks;
+
+  /// Overridable hardware-biometrics service; defaults to the real sensor.
+  final BiometricService? biometricService;
 
   @override
   State<ADigitalIdApp> createState() => _ADigitalIdAppState();
@@ -147,6 +152,7 @@ class _ADigitalIdAppState extends State<ADigitalIdApp> {
         showRegistration: _showRegistration,
         onSplashFinished: _finishSplash,
         onRetry: _retryStore,
+        biometricService: widget.biometricService,
       ),
     );
   }
@@ -160,12 +166,14 @@ class _AppHome extends StatelessWidget {
     required this.showRegistration,
     required this.onSplashFinished,
     required this.onRetry,
+    this.biometricService,
   });
 
   final Future<IdRecordStore> storeFuture;
   final bool showRegistration;
   final VoidCallback onSplashFinished;
   final VoidCallback onRetry;
+  final BiometricService? biometricService;
 
   @override
   Widget build(BuildContext context) {
@@ -181,7 +189,10 @@ class _AppHome extends StatelessWidget {
         if (snapshot.connectionState != ConnectionState.done) {
           return const _StoreLoadingView();
         }
-        return RegistrationPage(store: snapshot.data!);
+        return RegistrationPage(
+          store: snapshot.data!,
+          biometricService: biometricService,
+        );
       },
     );
   }

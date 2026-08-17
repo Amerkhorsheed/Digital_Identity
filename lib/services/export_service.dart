@@ -551,7 +551,12 @@ abstract final class ExportService {
                     detail('الوزن', _formatWeight(applicant.weightKg)),
                     detail('العين اليمنى', applicant.rightEyeAcuity.label),
                     detail('العين اليسرى', applicant.leftEyeAcuity.label),
-                    detail('البصمة', applicant.hasBiometric ? 'موثقة' : 'غير مسجلة'),
+                    detail(
+                      'البصمة',
+                      applicant.biometricStatusLabel,
+                    ),
+                    if (applicant.biometric != null)
+                      detail('مسار التوثيق', applicant.biometric!.method.shortLabel),
                   ],
                 ),
                 pw.SizedBox(height: 12),
@@ -560,13 +565,27 @@ abstract final class ExportService {
                 pw.Row(
                   children: [
                     pw.Expanded(
-                      child: pw.Text(
-                        'مصدر قياس الإبصار: ${applicant.visionSourceLabel}',
-                        style: pw.TextStyle(
-                          color: p.inkMuted,
-                          fontSize: 8,
-                          font: p.regular,
-                        ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            'مصدر قياس الإبصار: ${applicant.visionSourceLabel}',
+                            style: pw.TextStyle(
+                              color: p.inkMuted,
+                              fontSize: 8,
+                              font: p.regular,
+                            ),
+                          ),
+                          pw.Text(
+                            'مصدر التوثيق البيومتري: '
+                            '${applicant.biometricShortLabel}',
+                            style: pw.TextStyle(
+                              color: p.inkMuted,
+                              fontSize: 8,
+                              font: p.regular,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     pw.Text(

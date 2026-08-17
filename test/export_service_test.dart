@@ -1,12 +1,13 @@
 import 'dart:io';
 
 import 'package:a_digital_id/models/applicant.dart';
+import 'package:a_digital_id/models/biometric_capture.dart';
 import 'package:a_digital_id/services/export_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
-const _applicant = Applicant(
+final _applicant = Applicant(
   fullName: 'Sara Almaziad',
   birthYear: 2001,
   academicYear: AcademicYear.bachelor,
@@ -16,7 +17,13 @@ const _applicant = Applicant(
   bloodType: BloodType.oPositive,
   rightEyeAcuity: VisualAcuity.twentyTwenty,
   leftEyeAcuity: VisualAcuity.twentyTwentyFive,
-  hasBiometric: true,
+  biometric: BiometricCapture(
+    method: BiometricMethod.fingerprint,
+    capturedAtUtc: DateTime.utc(2026, 8, 16, 9, 25),
+    sensorLabel: 'مستشعر بصمة الإصبع',
+    attestation:
+        '9f2a4c1b7e05d38a6c4b0f19d27e5a3c8b6104ff2d9e7a5c3b18604d7e2f9a1c',
+  ),
 );
 
 final _issuedAt = DateTime.utc(2026, 8, 16, 9, 30);

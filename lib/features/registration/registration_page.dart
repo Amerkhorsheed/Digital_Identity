@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/brand_colors.dart';
 import '../../models/applicant.dart';
+import '../../models/biometric_capture.dart';
 import '../../models/vision_test.dart';
+import '../../services/biometric_service.dart';
 import '../../services/id_engine.dart';
 import '../../services/id_record_store.dart';
 import '../../shared/widgets/adaptive_layout.dart';
@@ -29,11 +31,13 @@ class ApplicantDraft {
   BloodType? bloodType;
   VisualAcuity? rightEyeAcuity;
   VisualAcuity? leftEyeAcuity;
-  bool hasBiometric = false;
+  BiometricCapture? biometric;
   VisionTestReport? visionTest;
   String? photoPath;
 
   bool get hasPhoto => photoPath != null && photoPath!.isNotEmpty;
+
+  bool get hasBiometric => biometric != null;
 }
 
 /// The four-step registration journey:
@@ -42,9 +46,16 @@ class ApplicantDraft {
 /// 3. Health measurements & Eye test (الصحة)
 /// 4. Portrait & Biometric fingerprint (البصمة)
 class RegistrationPage extends StatefulWidget {
-  const RegistrationPage({super.key, required this.store});
+  const RegistrationPage({
+    super.key,
+    required this.store,
+    this.biometricService,
+  });
 
   final IdRecordStore store;
+
+  /// خدمة مستشعر البصمة — تُحقن في الاختبارات، وتُبنى تلقائيًا في التشغيل.
+  final BiometricService? biometricService;
 
   @override
   State<RegistrationPage> createState() => _RegistrationPageState();
@@ -152,6 +163,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       draft: _draft,
                       errors: _visibleErrors(3),
                       onChanged: _refresh,
+                      biometricService: widget.biometricService,
                     ),
                   ],
                 ),
@@ -228,7 +240,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
           errors['photo'] = 'الصورة مطلوبة لإصدار بطاقة الهوية';
         }
         if (!draft.hasBiometric) {
-          errors['biometric'] = 'يرجى مسح وتأكيد بصمة الإصبع البيومترية';
+          errors['biometric'] =
+              'أنجز التوثيق البيومتري بمسح البصمة على مستشعر الجهاز';
         }
     }
     return errors;
@@ -275,7 +288,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       bloodType: draft.bloodType!,
       rightEyeAcuity: draft.rightEyeAcuity!,
       leftEyeAcuity: draft.leftEyeAcuity!,
-      hasBiometric: draft.hasBiometric,
+      biometric: draft.biometric,
       visionTest: draft.visionTest,
       photoPath: draft.photoPath,
     );

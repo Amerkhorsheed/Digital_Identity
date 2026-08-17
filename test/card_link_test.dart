@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:a_digital_id/config/verify_endpoint.dart';
 import 'package:a_digital_id/models/applicant.dart';
+import 'package:a_digital_id/models/biometric_capture.dart';
 import 'package:a_digital_id/models/vision_test.dart';
 import 'package:a_digital_id/services/card_link.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,7 +24,13 @@ final _applicant = Applicant(
   bloodType: BloodType.oPositive,
   rightEyeAcuity: VisualAcuity.twentyTwenty,
   leftEyeAcuity: VisualAcuity.twentyThirty,
-  hasBiometric: true,
+  biometric: BiometricCapture(
+    method: BiometricMethod.fingerprint,
+    capturedAtUtc: DateTime.utc(2026, 8, 16, 9, 25),
+    sensorLabel: 'مستشعر بصمة الإصبع',
+    attestation:
+        '9f2a4c1b7e05d38a6c4b0f19d27e5a3c8b6104ff2d9e7a5c3b18604d7e2f9a1c',
+  ),
   visionTest: _report,
   photoPath: '/tmp/portrait.jpg',
 );
@@ -47,7 +54,7 @@ void main() {
 
   test('falls back to the app scheme until a verifier page is configured', () {
     expect(kHasHostedVerifier, isFalse);
-    expect(_encode(), startsWith('adigitalid://card?v=2&d='));
+    expect(_encode(), startsWith('adigitalid://card?v=3&d='));
   });
 
   test('reads a hosted verifier link with the payload in its fragment', () {
@@ -101,6 +108,33 @@ void main() {
     expect(card.applicant.leftEyeAcuity, VisualAcuity.twentyThirty);
     expect(card.applicant.hasBiometric, isTrue);
     expect(card.applicant.visionSourceShortLabel, 'فحص تفاعلي · 40 سم');
+
+    // The card carries how the biometric was taken, not just that it was.
+    final biometric = card.applicant.biometric!;
+    expect(biometric.method, BiometricMethod.fingerprint);
+    expect(biometric.capturedAtUtc, DateTime.utc(2026, 8, 16, 9, 25));
+    expect(biometric.attestation, '9f2a4c1b7e05');
+    expect(biometric.shortAttestation, '9F2A-4C1B-7E05');
+    expect(card.applicant.biometricShortLabel, contains('بصمة إصبع'));
+  });
+
+  test('a card issued without a biometric says so, and invents nothing', () {
+    final unverified = Applicant(
+      fullName: _applicant.fullName,
+      birthYear: _applicant.birthYear,
+      academicYear: _applicant.academicYear,
+      governorate: _applicant.governorate,
+      heightCm: _applicant.heightCm,
+      weightKg: _applicant.weightKg,
+      bloodType: _applicant.bloodType,
+      rightEyeAcuity: _applicant.rightEyeAcuity,
+      leftEyeAcuity: _applicant.leftEyeAcuity,
+    );
+
+    final card = CardLink.decode(_encode(unverified))!;
+    expect(card.applicant.biometric, isNull);
+    expect(card.applicant.hasBiometric, isFalse);
+    expect(card.applicant.biometricShortLabel, 'غير موثّقة');
   });
 
   test('marks a manually entered acuity as such', () {
@@ -115,7 +149,7 @@ void main() {
       bloodType: manual.bloodType,
       rightEyeAcuity: manual.rightEyeAcuity,
       leftEyeAcuity: manual.leftEyeAcuity,
-      hasBiometric: manual.hasBiometric,
+      biometric: manual.biometric,
     );
 
     final card = CardLink.decode(_encode(withoutTest))!;

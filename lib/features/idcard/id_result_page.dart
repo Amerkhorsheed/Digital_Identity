@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import '../../app/theme/brand_colors.dart';
 import '../../config/verify_endpoint.dart';
@@ -17,7 +17,8 @@ import 'qr_presenter.dart';
 /// action: a card you just issued, or someone else's card you just scanned.
 enum IdResultMode { issued, scanned }
 
-/// Final screen: the identity card, flippable in 3D with full front and back details.
+/// Final screen: the identity card opened out — both faces held in a single
+/// object, so every detail is readable at once with nothing to flip.
 class IdResultPage extends StatefulWidget {
   const IdResultPage({
     super.key,
@@ -37,9 +38,7 @@ class IdResultPage extends StatefulWidget {
 }
 
 class _IdResultPageState extends State<IdResultPage>
-    with TickerProviderStateMixin {
-  /// 0 = front, 1 = back. Settles on a face and stays there.
-  late final AnimationController _flip;
+    with SingleTickerProviderStateMixin {
   late final AnimationController _reveal;
 
   /// The string drawn into the QR: a link that rebuilds this exact card.
@@ -53,25 +52,17 @@ class _IdResultPageState extends State<IdResultPage>
       personalId: widget.personalId,
       issuedAt: widget.issuedAt,
     );
-    _flip = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 620),
-      value: 0,
-    );
     _reveal = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 720),
+      duration: const Duration(milliseconds: 900),
     )..forward();
   }
 
   @override
   void dispose() {
-    _flip.dispose();
     _reveal.dispose();
     super.dispose();
   }
-
-  bool get _showingBack => _flip.value > 0.5;
 
   /// Blows the QR up to fill the screen — the size a camera needs.
   void _presentQr() {
@@ -81,15 +72,6 @@ class _IdResultPageState extends State<IdResultPage>
       personalId: widget.personalId,
       hosted: kHasHostedVerifier,
     );
-  }
-
-  void _toggleFlip() {
-    HapticFeedback.selectionClick();
-    if (_showingBack) {
-      _flip.animateBack(0, curve: Curves.easeOutCubic);
-    } else {
-      _flip.animateTo(1, curve: Curves.easeOutCubic);
-    }
   }
 
   @override
@@ -102,8 +84,15 @@ class _IdResultPageState extends State<IdResultPage>
       ScreenBand.expanded => 460.0,
       ScreenBand.television => 560.0,
     };
-    final cardWidth =
-        math.min(base, size.width - band.gutter * 2).clamp(240.0, 620.0);
+    // The two faces sit flush against each other, so a side-by-side spread
+    // costs exactly two face widths. It is only worth it when each face still
+    // lands at a comfortable reading size; otherwise the spread stacks.
+    final available =
+        math.min(size.width - band.gutter * 2, band.contentWidth);
+    final sideBySide = band.isWide && available / 2 >= 330;
+    final cardWidth = sideBySide
+        ? math.min(base, available / 2).clamp(300.0, 620.0)
+        : math.min(base, available).clamp(240.0, 620.0);
 
     return Scaffold(
       body: OrnamentBackground(
@@ -128,31 +117,18 @@ class _IdResultPageState extends State<IdResultPage>
                         mode: widget.mode,
                       ),
                       SizedBox(height: band.isCompact ? 24 : 32),
-                      _FlipStage(
-                        flip: _flip,
+                      _CardSpread(
                         reveal: _reveal,
                         cardWidth: cardWidth,
-                        onTap: _toggleFlip,
-                        front: IdCardView(
-                          applicant: widget.applicant,
-                          personalId: widget.personalId,
-                          issuedAt: widget.issuedAt,
-                          cardWidth: cardWidth,
-                        ),
-                        back: IdCardBack(
-                          applicant: widget.applicant,
-                          personalId: widget.personalId,
-                          qrData: _qrData,
-                          issuedAt: widget.issuedAt,
-                          cardWidth: cardWidth,
-                        ),
+                        sideBySide: sideBySide,
+                        applicant: widget.applicant,
+                        personalId: widget.personalId,
+                        issuedAt: widget.issuedAt,
+                        qrData: _qrData,
+                        onTap: _presentQr,
                       ),
-                      const SizedBox(height: 16),
-                      _FlipControls(
-                        flip: _flip,
-                        onToggle: _toggleFlip,
-                        onPresent: _presentQr,
-                      ),
+                      const SizedBox(height: 18),
+                      _SpreadControls(onPresent: _presentQr),
                       const SizedBox(height: 32),
                       Center(
                         child: OutlinedButton.icon(
@@ -222,7 +198,7 @@ class _SuccessHeader extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             issued
-                ? 'تم إصدار بطاقتك بنجاح. يمكنك معاينة وجهي البطاقة ورمز QR.'
+                ? 'تم إصدار بطاقتك بنجاح. الوجهان الأمامي والخلفي معًا في بطاقة واحدة.'
                 : 'تمت قراءة بيانات البطاقة ومعاينتها بنجاح.',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
@@ -375,91 +351,129 @@ class _SuccessBadgeState extends State<_SuccessBadge>
   }
 }
 
-// ------------------------------------------------------------------ القلب 3D
+// ------------------------------------------------------------- البطاقة المفتوحة
 
-/// A real two-sided card: the front face rotates away and the back face
-/// rotates in behind it. The rotation is driven by a controller that always
-/// settles on a face — it never loops.
-class _FlipStage extends StatelessWidget {
-  const _FlipStage({
-    required this.flip,
+/// The card, opened out.
+///
+/// Both faces live inside a single shell — one radius, one gold edge, one
+/// shadow — joined by a gold fold seam instead of being flipped between. On a
+/// wide screen the two faces sit side by side like an open passport; otherwise
+/// they stack. The faces themselves are the untouched [IdCardView] /
+/// [IdCardBack] artwork, so the card stays identical to the exported and web
+/// versions — only the way it is presented changed.
+class _CardSpread extends StatelessWidget {
+  const _CardSpread({
     required this.reveal,
     required this.cardWidth,
-    required this.front,
-    required this.back,
+    required this.sideBySide,
+    required this.applicant,
+    required this.personalId,
+    required this.issuedAt,
+    required this.qrData,
     required this.onTap,
   });
 
-  final AnimationController flip;
   final Animation<double> reveal;
   final double cardWidth;
-  final Widget front;
-  final Widget back;
+  final bool sideBySide;
+  final Applicant applicant;
+  final String personalId;
+  final DateTime issuedAt;
+  final String qrData;
   final VoidCallback onTap;
-
-  void _onDragUpdate(DragUpdateDetails details) {
-    // A full flip takes roughly the width of the card in drag distance.
-    flip.value =
-        (flip.value - details.primaryDelta! / cardWidth).clamp(0.0, 1.0);
-  }
-
-  void _onDragEnd(DragEndDetails details) {
-    final velocity = details.primaryVelocity ?? 0;
-    final toBack = velocity.abs() > 300
-        ? velocity < 0
-        : flip.value > 0.5;
-    if (toBack) {
-      flip.animateTo(1, curve: Curves.easeOutCubic);
-    } else {
-      flip.animateBack(0, curve: Curves.easeOutCubic);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    final entrance = CurvedAnimation(
-      parent: reveal,
-      curve: Curves.easeOutBack,
+    final radius = Radius.circular(cardWidth * 0.045);
+    final height = cardWidth * 0.625;
+    final shell = BorderRadius.all(radius);
+
+    // Outer corners keep the card's own curve; the corners that meet at the
+    // seam are squared off so the two faces read as one continuous surface.
+    final front = IdCardView(
+      applicant: applicant,
+      personalId: personalId,
+      issuedAt: issuedAt,
+      cardWidth: cardWidth,
+      elevated: false,
+      corners: sideBySide
+          ? BorderRadiusDirectional.horizontal(start: radius)
+          : BorderRadius.vertical(top: radius),
     );
+    final back = IdCardBack(
+      applicant: applicant,
+      personalId: personalId,
+      qrData: qrData,
+      issuedAt: issuedAt,
+      cardWidth: cardWidth,
+      elevated: false,
+      bordered: false,
+      corners: sideBySide
+          ? BorderRadiusDirectional.horizontal(end: radius)
+          : BorderRadius.vertical(bottom: radius),
+    );
+
+    final spreadWidth = sideBySide ? cardWidth * 2 : cardWidth;
+    final spreadHeight = sideBySide ? height : height * 2;
 
     return Center(
       child: Semantics(
         button: true,
-        label: 'بطاقة الهوية — اضغط لقلبها',
+        label: 'بطاقة الهوية — الوجه الأمامي والخلفي، اضغط لتكبير رمز التحقق',
         child: GestureDetector(
           onTap: onTap,
-          onHorizontalDragUpdate: _onDragUpdate,
-          onHorizontalDragEnd: _onDragEnd,
           behavior: HitTestBehavior.opaque,
-          child: AnimatedBuilder(
-            animation: Listenable.merge([flip, reveal]),
-            builder: (context, _) {
-              final angle = flip.value * math.pi;
-              final showBack = flip.value > 0.5;
-              final scale = 0.88 + 0.12 * entrance.value.clamp(0.0, 1.2);
-
-              return Opacity(
-                opacity: reveal.value.clamp(0.0, 1.0),
-                child: Transform.scale(
-                  scale: scale,
-                  child: Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.identity()
-                      ..setEntry(3, 2, 0.0012)
-                      ..rotateY(angle),
-                    child: showBack
-                        // The back is pre-rotated so it reads correctly once
-                        // the card has turned past the halfway point.
-                        ? Transform(
-                            alignment: Alignment.center,
-                            transform: Matrix4.rotationY(math.pi),
-                            child: back,
-                          )
-                        : front,
+          child: _RevealTransition(
+            reveal: reveal,
+            child: SizedBox(
+              width: spreadWidth,
+              height: spreadHeight,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: shell,
+                  boxShadow: [
+                    BoxShadow(
+                      color: BrandColors.pine.withValues(alpha: 0.28),
+                      blurRadius: 40,
+                      spreadRadius: -8,
+                      offset: const Offset(0, 20),
+                    ),
+                    BoxShadow(
+                      color: BrandColors.gold.withValues(alpha: 0.18),
+                      blurRadius: 16,
+                      spreadRadius: -4,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Container(
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(borderRadius: shell),
+                  foregroundDecoration: BoxDecoration(
+                    borderRadius: shell,
+                    border: Border.all(color: BrandColors.gold, width: 1.4),
+                  ),
+                  child: Stack(
+                    children: [
+                      if (sideBySide)
+                        Row(children: [front, back])
+                      else
+                        Column(children: [front, back]),
+                      Positioned.fill(
+                        child: _FoldSeam(
+                          reveal: reveal,
+                          vertical: sideBySide,
+                          cardWidth: cardWidth,
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: _Sheen(reveal: reveal, width: spreadWidth),
+                      ),
+                    ],
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ),
       ),
@@ -467,81 +481,219 @@ class _FlipStage extends StatelessWidget {
   }
 }
 
-class _FlipControls extends StatelessWidget {
-  const _FlipControls({
-    required this.flip,
-    required this.onToggle,
-    required this.onPresent,
-  });
+/// The card settles into place once: it rises, scales up and fades in.
+class _RevealTransition extends StatelessWidget {
+  const _RevealTransition({required this.reveal, required this.child});
 
-  final AnimationController flip;
-  final VoidCallback onToggle;
-  final VoidCallback onPresent;
+  final Animation<double> reveal;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
+    final settle = CurvedAnimation(
+      parent: reveal,
+      curve: const Interval(0, 0.75, curve: Curves.easeOutCubic),
+    );
+
     return AnimatedBuilder(
-      animation: flip,
-      builder: (context, _) {
-        final showingBack = flip.value > 0.5;
-        return Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _FaceDot(active: !showingBack, label: 'الوجه'),
-                const SizedBox(width: 8),
-                _FaceDot(active: showingBack, label: 'الظهر'),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 4,
-              children: [
-                TextButton.icon(
-                  onPressed: onToggle,
-                  icon: const Icon(Icons.threed_rotation_rounded, size: 18),
-                  label: Text(
-                    showingBack ? 'إظهار وجه البطاقة' : 'إظهار ظهر البطاقة',
-                  ),
-                ),
-                TextButton.icon(
-                  onPressed: onPresent,
-                  icon: const Icon(Icons.fullscreen_rounded, size: 18),
-                  label: const Text('تكبير رمز المسح'),
-                ),
-              ],
-            ),
-          ],
+      animation: settle,
+      child: child,
+      builder: (context, child) {
+        final t = settle.value.clamp(0.0, 1.0);
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(0, 26 * (1 - t)),
+            child: Transform.scale(scale: 0.94 + 0.06 * t, alignment: Alignment.center, child: child),
+          ),
         );
       },
     );
   }
 }
 
-class _FaceDot extends StatelessWidget {
-  const _FaceDot({required this.active, required this.label});
+/// The join between the two faces: a gold hairline that draws itself out from
+/// the middle, finished with the brand lozenge sitting astride the fold.
+class _FoldSeam extends StatelessWidget {
+  const _FoldSeam({
+    required this.reveal,
+    required this.vertical,
+    required this.cardWidth,
+  });
 
-  final bool active;
-  final String label;
+  final Animation<double> reveal;
+
+  /// True when the faces are side by side and the seam runs top to bottom.
+  final bool vertical;
+  final double cardWidth;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: BrandDurations.quick,
-      padding: EdgeInsets.symmetric(horizontal: active ? 12 : 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: active ? BrandColors.pine : BrandColors.ivoryDeep,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: active ? BrandColors.goldGlow : BrandColors.inkMuted,
-              fontWeight: FontWeight.w700,
+    final line = CurvedAnimation(
+      parent: reveal,
+      curve: const Interval(0.35, 0.9, curve: Curves.easeOutCubic),
+    );
+    final mark = CurvedAnimation(
+      parent: reveal,
+      curve: const Interval(0.6, 1, curve: Curves.easeOutBack),
+    );
+    final markSize = cardWidth * 0.055;
+
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: reveal,
+        builder: (context, _) {
+          final grow = line.value.clamp(0.0, 1.0);
+          final pop = mark.value.clamp(0.0, 1.4);
+
+          // The lozenge covers the middle of the rule, so the gold has to hold
+          // its strength well out towards the edges or the seam disappears.
+          final rule = Transform.scale(
+            scaleX: vertical ? 1 : grow,
+            scaleY: vertical ? grow : 1,
+            child: Container(
+              width: vertical ? 1.4 : double.infinity,
+              height: vertical ? double.infinity : 1.4,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: vertical ? Alignment.topCenter : Alignment.centerLeft,
+                  end: vertical ? Alignment.bottomCenter : Alignment.centerRight,
+                  stops: const [0, 0.12, 0.88, 1],
+                  colors: [
+                    BrandColors.gold.withValues(alpha: 0.35),
+                    BrandColors.gold,
+                    BrandColors.gold,
+                    BrandColors.gold.withValues(alpha: 0.35),
+                  ],
+                ),
+              ),
             ),
+          );
+
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              Center(
+                child: SizedBox(
+                  width: vertical ? markSize : double.infinity,
+                  height: vertical ? double.infinity : markSize,
+                  child: Center(child: rule),
+                ),
+              ),
+              Transform.scale(
+                scale: pop,
+                child: Transform.rotate(
+                  angle: math.pi / 4,
+                  child: Container(
+                    width: markSize,
+                    height: markSize,
+                    padding: EdgeInsets.all(markSize * 0.22),
+                    decoration: BoxDecoration(
+                      gradient: BrandGradients.gold,
+                      borderRadius: BorderRadius.circular(markSize * 0.1),
+                      border: Border.all(
+                        color: BrandColors.goldDeep.withValues(alpha: 0.55),
+                        width: 0.8,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: BrandColors.pineDeep.withValues(alpha: 0.28),
+                          blurRadius: 7,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    // A pine core inside the gold lozenge — the same figure the
+                    // ornament lattice repeats across the backdrop.
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: BrandColors.pine.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(markSize * 0.05),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
+    );
+  }
+}
+
+/// A single pass of light across the card as it appears — the glint you get
+/// tilting a laminated card under a lamp. Plays once, then stays out of view.
+class _Sheen extends StatelessWidget {
+  const _Sheen({required this.reveal, required this.width});
+
+  final Animation<double> reveal;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final sweep = CurvedAnimation(
+      parent: reveal,
+      curve: const Interval(0.25, 1, curve: Curves.easeInOutCubic),
+    );
+
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: sweep,
+        builder: (context, _) {
+          final t = sweep.value.clamp(0.0, 1.0);
+          if (t == 0 || t == 1) return const SizedBox.shrink();
+          final band = width * 0.4;
+          return Transform.translate(
+            offset: Offset(-width - band + (width * 2 + band * 2) * t, 0),
+            child: Transform.rotate(
+              angle: -0.28,
+              child: Container(
+                width: band,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.white.withValues(alpha: 0),
+                      Colors.white.withValues(alpha: 0.16),
+                      Colors.white.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Everything under the card. Nothing here switches faces — both are already
+/// on screen — so the only action left is blowing the QR up to scanning size,
+/// which is the one thing a spread cannot do on its own.
+class _SpreadControls extends StatelessWidget {
+  const _SpreadControls({required this.onPresent});
+
+  final VoidCallback onPresent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        TextButton.icon(
+          onPressed: onPresent,
+          icon: const Icon(Icons.fullscreen_rounded, size: 18),
+          label: const Text('تكبير رمز المسح'),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'اضغط على البطاقة لتكبير رمز التحقق',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: BrandColors.inkMuted,
+              ),
+        ),
+      ],
     );
   }
 }

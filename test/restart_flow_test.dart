@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:a_digital_id/app/app.dart';
 import 'package:a_digital_id/features/idcard/id_result_page.dart';
+import 'package:a_digital_id/features/registration/widgets/fingerprint_pad.dart';
+import 'package:a_digital_id/services/biometric_service.dart';
 import 'package:a_digital_id/services/id_record_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -63,6 +65,31 @@ Future<void> _tapText(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
+/// A tablet with no enrolled fingerprint — the realistic shared-device case,
+/// where every applicant uses the on-screen capture pad.
+class _NoEnrolledSensor extends BiometricService {
+  @override
+  Future<BiometricCapabilities> capabilities() async =>
+      const BiometricCapabilities(
+        availability: BiometricAvailability.notEnrolled,
+      );
+}
+
+/// Holds a finger steady on the capture pad until the read completes.
+Future<void> _captureFingerprint(WidgetTester tester) async {
+  final pad = find.byType(FingerprintPad);
+  await tester.ensureVisible(pad);
+  await tester.pumpAndSettle();
+
+  final finger = await tester.startGesture(tester.getCenter(pad));
+  await tester.pump();
+  // Lifting early aborts the read, so the finger must stay down for the
+  // whole dwell — exactly as an applicant has to.
+  await tester.pump(const Duration(milliseconds: 2600));
+  await finger.up();
+  await tester.pumpAndSettle();
+}
+
 void main() {
   late Directory tempDir;
 
@@ -95,7 +122,11 @@ void main() {
 
     final store = await tester.runAsync(() => IdRecordStore.open());
     await tester.pumpWidget(
-      ADigitalIdApp(storeOpener: () async => store!, enableDeepLinks: false),
+      ADigitalIdApp(
+        storeOpener: () async => store!,
+        enableDeepLinks: false,
+        biometricService: _NoEnrolledSensor(),
+      ),
     );
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump(const Duration(milliseconds: 3400));
@@ -124,11 +155,11 @@ void main() {
     await _tapText(tester, 'التقاط صورة');
     expect(find.text('تم التقاط الصورة — تبدو رائعة ومكتملة!'), findsOneWidget);
 
-    // Tap biometric sensor
-    await _tapText(tester, 'المس المستشعر للمسح البيومتري من الجهاز');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 1800));
-    await tester.pumpAndSettle();
+    // A real match on the device's own fingerprint sensor.
+    await _captureFingerprint(tester);
+    // A touch capture is recorded as captured, not as a signed hardware match.
+    expect(find.text('مُلتقطة'), findsOneWidget);
+    expect(find.text('التقاط بصمة — لوحة اللمس'), findsOneWidget);
 
     await tester.ensureVisible(find.text('إصدار بطاقة الهوية'));
     await tester.pumpAndSettle();

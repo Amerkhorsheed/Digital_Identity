@@ -290,7 +290,18 @@
 
           $('personalId').textContent = card.personalId;
           $('fullName').textContent = card.fullName;
-          $('bioBadge').style.display = card.hasBiometric ? 'inline-flex' : 'none';
+          if (card.hasBiometric) {
+            $('bioBadge').style.display = 'inline-flex';
+            if (card.biometric) {
+              $('bioBadge').textContent = card.biometric.isHardwareMatch
+                ? '✓ بصمة بيومترية موثقة'
+                : '✓ بصمة إصبع ملتقطة';
+            } else {
+              $('bioBadge').textContent = '✓ بصمة بيومترية موثقة';
+            }
+          } else {
+            $('bioBadge').style.display = 'none';
+          }
 
           const visionText = card.rightEye === card.leftEye
             ? card.rightEye

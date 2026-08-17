@@ -8,7 +8,7 @@
 // so the identity data is decoded here in the browser and never reaches any
 // server.
 
-export const FORMAT_VERSION = 2;
+export const FORMAT_VERSION = 3;
 
 const ACADEMIC_YEARS = [
   'إجازة جامعية (بكالوريوس)',
@@ -24,6 +24,14 @@ const BLOOD_TYPES = ['A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−'];
 const ACUITIES = [
   '20/10', '20/13', '20/16', '20/20', '20/25', '20/30',
   '20/40', '20/50', '20/70', '20/100', '20/200', 'أسوأ من 20/200',
+];
+
+const BIOMETRIC_METHODS = [
+  { code: 'HW-FP', label: 'بصمة إصبع — مستشعر الجهاز', shortLabel: 'بصمة إصبع', isHw: true },
+  { code: 'HW-FACE', label: 'تعرّف على الوجه — مستشعر الجهاز', shortLabel: 'تعرّف على الوجه', isHw: true },
+  { code: 'HW-IRIS', label: 'بصمة قزحية — مستشعر الجهاز', shortLabel: 'بصمة قزحية', isHw: true },
+  { code: 'HW-BIO', label: 'قياس حيوي موثّق من الجهاز', shortLabel: 'قياس حيوي', isHw: true },
+  { code: 'TP-FP', label: 'التقاط بصمة — لوحة اللمس', shortLabel: 'التقاط لمسي', isHw: false },
 ];
 
 const MONTHS = [
@@ -75,7 +83,42 @@ function toCard(map) {
 
   const governorate = map.g || '';
   const birthYear = map.a || 2001;
-  const hasBiometric = map.p !== 0;
+
+  let biometric = null;
+  if (typeof map.pb === 'string') {
+    const parts = map.pb.split('.');
+    const methodIdx = parseInt(parts[0], 10);
+    if (!isNaN(methodIdx) && methodIdx >= 0 && methodIdx < BIOMETRIC_METHODS.length) {
+      const method = BIOMETRIC_METHODS[methodIdx];
+      const age = parseInt(parts[1], 10) || 0;
+      const quality = parseInt(parts[2], 10);
+      const hash = parts[3] || '';
+      const shortHash =
+        hash && hash.length >= 12
+          ? `${hash.slice(0, 4)}-${hash.slice(4, 8)}-${hash.slice(8, 12)}`.toUpperCase()
+          : hash ? hash.toUpperCase() : null;
+
+      let provenanceLabel = method.shortLabel;
+      if (quality >= 0) provenanceLabel += ` · جودة ${quality}٪`;
+      if (shortHash) provenanceLabel += ` · ${shortHash}`;
+
+      biometric = {
+        method,
+        age,
+        quality: quality >= 0 ? quality : null,
+        hash,
+        shortHash,
+        isHardwareMatch: method.isHw,
+        verificationLabel: method.isHw ? 'موثقة' : 'مُلتقطة',
+        provenanceLabel,
+      };
+    }
+  }
+
+  const hasBiometric = biometric !== null || (map.p !== undefined && map.p !== 0);
+  const biometricLabel = biometric
+    ? biometric.provenanceLabel
+    : (hasBiometric ? 'موثقة بيومترياً' : 'غير مسجلة');
 
   return {
     personalId: map.i || '',
@@ -89,8 +132,9 @@ function toCard(map) {
     bloodType: pick(BLOOD_TYPES, map.b),
     rightEye: pick(ACUITIES, map.r),
     leftEye: pick(ACUITIES, map.l),
+    biometric,
     hasBiometric,
-    biometricLabel: hasBiometric ? 'موثقة بيومترياً' : 'غير مسجلة',
+    biometricLabel,
     visionDistanceCm: typeof map.m === 'number' ? map.m : null,
     visionSource:
       typeof map.m === 'number' ? `فحص تفاعلي · ${map.m} سم` : 'إدخال يدوي',

@@ -115,6 +115,11 @@ class IdCardSheet extends StatelessWidget {
 }
 
 /// Front face: pine gradient, portrait, name and personal ID.
+///
+/// [corners] and [elevated] exist so a caller can fuse this face into a larger
+/// surface — the result page joins both faces edge to edge inside one shell.
+/// Left at their defaults the face renders exactly as it always has, which is
+/// what the PNG/PDF exports rely on.
 class IdCardView extends StatelessWidget {
   const IdCardView({
     super.key,
@@ -123,6 +128,8 @@ class IdCardView extends StatelessWidget {
     required this.issuedAt,
     required this.cardWidth,
     this.images,
+    this.corners,
+    this.elevated = true,
   });
 
   final Applicant applicant;
@@ -130,6 +137,8 @@ class IdCardView extends StatelessWidget {
   final DateTime issuedAt;
   final double cardWidth;
   final CardImages? images;
+  final BorderRadiusGeometry? corners;
+  final bool elevated;
 
   @override
   Widget build(BuildContext context) {
@@ -142,15 +151,17 @@ class IdCardView extends StatelessWidget {
       height: height,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(cardWidth * 0.045),
+        borderRadius: corners ?? BorderRadius.circular(cardWidth * 0.045),
         gradient: BrandGradients.pine,
-        boxShadow: [
-          BoxShadow(
-            color: BrandColors.pine.withValues(alpha: 0.35),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        boxShadow: elevated
+            ? [
+                BoxShadow(
+                  color: BrandColors.pine.withValues(alpha: 0.35),
+                  blurRadius: 30,
+                  offset: const Offset(0, 14),
+                ),
+              ]
+            : null,
       ),
       child: Stack(
         children: [
@@ -319,6 +330,9 @@ String _formatDate(DateTime date) {
 }
 
 /// Back face: verifiable QR code plus the full identity details.
+///
+/// See [IdCardView] for [corners] and [elevated]; [bordered] drops the gold
+/// edge for the same reason — inside a spread the shell carries the edge.
 class IdCardBack extends StatelessWidget {
   const IdCardBack({
     super.key,
@@ -328,6 +342,9 @@ class IdCardBack extends StatelessWidget {
     required this.issuedAt,
     required this.cardWidth,
     this.images,
+    this.corners,
+    this.elevated = true,
+    this.bordered = true,
   });
 
   final Applicant applicant;
@@ -336,6 +353,9 @@ class IdCardBack extends StatelessWidget {
   final DateTime issuedAt;
   final double cardWidth;
   final CardImages? images;
+  final BorderRadiusGeometry? corners;
+  final bool elevated;
+  final bool bordered;
 
   @override
   Widget build(BuildContext context) {
@@ -346,16 +366,19 @@ class IdCardBack extends StatelessWidget {
       height: height,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(cardWidth * 0.045),
+        borderRadius: corners ?? BorderRadius.circular(cardWidth * 0.045),
         color: BrandColors.ivory,
-        border: Border.all(color: BrandColors.gold, width: 1.4),
-        boxShadow: [
-          BoxShadow(
-            color: BrandColors.pine.withValues(alpha: 0.18),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        border:
+            bordered ? Border.all(color: BrandColors.gold, width: 1.4) : null,
+        boxShadow: elevated
+            ? [
+                BoxShadow(
+                  color: BrandColors.pine.withValues(alpha: 0.18),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12),
+                ),
+              ]
+            : null,
       ),
       child: Stack(
         children: [
@@ -468,6 +491,34 @@ class IdCardBack extends StatelessWidget {
                         color: BrandColors.gold.withValues(alpha: 0.4),
                       ),
                       SizedBox(height: cardWidth * 0.015),
+                      // How this card's biometric was taken — the path, its
+                      // quality, and the template fingerprint.
+                      Row(
+                        children: [
+                          Icon(
+                            applicant.hasBiometric
+                                ? Icons.fingerprint_rounded
+                                : Icons.fingerprint_outlined,
+                            size: cardWidth * 0.022,
+                            color: applicant.hasBiometric
+                                ? BrandColors.goldDeep
+                                : BrandColors.inkMuted,
+                          ),
+                          SizedBox(width: cardWidth * 0.01),
+                          Expanded(
+                            child: Text(
+                              applicant.biometricShortLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: cardWidth * 0.0155,
+                                color: BrandColors.inkMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: cardWidth * 0.008),
                       Row(
                         children: [
                           Icon(

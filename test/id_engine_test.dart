@@ -1,10 +1,11 @@
 import 'dart:convert';
 
 import 'package:a_digital_id/models/applicant.dart';
+import 'package:a_digital_id/models/biometric_capture.dart';
 import 'package:a_digital_id/services/id_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-const _applicant = Applicant(
+final _applicant = Applicant(
   fullName: 'سارة محمد المزيد',
   birthYear: 2001,
   academicYear: AcademicYear.bachelor,
@@ -14,7 +15,13 @@ const _applicant = Applicant(
   bloodType: BloodType.oPositive,
   rightEyeAcuity: VisualAcuity.twentyTwenty,
   leftEyeAcuity: VisualAcuity.twentyTwenty,
-  hasBiometric: true,
+  biometric: BiometricCapture(
+    method: BiometricMethod.fingerprint,
+    capturedAtUtc: DateTime.utc(2026, 8, 16, 9, 25),
+    sensorLabel: 'مستشعر بصمة الإصبع',
+    attestation:
+        '9f2a4c1b7e05d38a6c4b0f19d27e5a3c8b6104ff2d9e7a5c3b18604d7e2f9a1c',
+  ),
   photoPath: '/tmp/photo.jpg',
 );
 
@@ -36,7 +43,7 @@ void main() {
     test('varies across applicants and dates', () async {
       final sara = await IdEngine.createPersonalId(_applicant, DateTime.utc(2026, 8, 16));
       final other = await IdEngine.createPersonalId(
-        const Applicant(
+        Applicant(
           fullName: 'عمر خالد الحداد',
           birthYear: 1999,
           academicYear: AcademicYear.master,
@@ -46,7 +53,10 @@ void main() {
           bloodType: BloodType.aNegative,
           rightEyeAcuity: VisualAcuity.twentyTwentyFive,
           leftEyeAcuity: VisualAcuity.twentyThirty,
-          hasBiometric: true,
+          biometric: BiometricCapture(
+            method: BiometricMethod.fingerprint,
+            capturedAtUtc: DateTime.utc(2026, 8, 16, 9, 25),
+          ),
         ),
         DateTime.utc(2026, 8, 16),
       );

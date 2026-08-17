@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'biometric_capture.dart';
 import 'vision_test.dart';
 
 /// المرحلة الدراسية / المؤهل العلمي للمتقدّم.
@@ -87,7 +88,7 @@ class Applicant {
     required this.rightEyeAcuity,
     required this.leftEyeAcuity,
     this.turnNumber = 'A-001',
-    this.hasBiometric = true,
+    this.biometric,
     this.visionTest,
     this.photoPath,
   });
@@ -122,8 +123,10 @@ class Applicant {
   /// حدة إبصار العين اليسرى.
   final VisualAcuity leftEyeAcuity;
 
-  /// هل تم التحقق من بصمة الإصبع بيومترياً.
-  final bool hasBiometric;
+  /// سجلّ التوثيق البيومتري: المسار المستخدم، ووقته، وجودته، وبصمة قالبه.
+  ///
+  /// `null` يعني أن الخطوة لم تُنجز بعد — لا يوجد "توثيق افتراضي".
+  final BiometricCapture? biometric;
 
   /// تفاصيل فحص النظر التفاعلي عند إجرائه داخل التطبيق.
   final VisionTestReport? visionTest;
@@ -143,7 +146,7 @@ class Applicant {
     VisualAcuity? rightEyeAcuity,
     VisualAcuity? leftEyeAcuity,
     String? turnNumber,
-    bool? hasBiometric,
+    BiometricCapture? biometric,
     String? photoPath,
     VisionTestReport? visionTest,
   }) {
@@ -158,7 +161,7 @@ class Applicant {
       rightEyeAcuity: rightEyeAcuity ?? this.rightEyeAcuity,
       leftEyeAcuity: leftEyeAcuity ?? this.leftEyeAcuity,
       turnNumber: turnNumber ?? this.turnNumber,
-      hasBiometric: hasBiometric ?? this.hasBiometric,
+      biometric: biometric ?? this.biometric,
       visionTest: visionTest ?? this.visionTest,
       photoPath: photoPath ?? this.photoPath,
     );
@@ -168,6 +171,23 @@ class Applicant {
   String get placeLabel => governorate;
 
   bool get hasPhoto => photoPath != null && photoPath!.isNotEmpty;
+
+  /// هل أُنجز التوثيق البيومتري؟
+  bool get hasBiometric => biometric != null;
+
+  /// وصف مصدر التوثيق البيومتري، لرمز QR وشهادة PDF.
+  String get biometricSourceLabel => biometric?.method.label ?? 'غير موثّقة';
+
+  /// حالة التوثيق كما تُطبع على البطاقة.
+  ///
+  /// تميّز بين مطابقة موقّعة من عتاد الجهاز («موثقة») والتقاط لمسي
+  /// («مُلتقطة») — فالبطاقة لا تدّعي أكثر ممّا جرى فعلًا.
+  String get biometricStatusLabel =>
+      biometric?.verificationLabel ?? 'غير مسجلة';
+
+  /// السطر المختصر الذي يُطبع على ظهر البطاقة.
+  String get biometricShortLabel =>
+      biometric?.provenanceLabel ?? 'غير موثّقة';
 
   /// مصدر قياس حدة الإبصار، لتوثيقه في رمز QR وشهادة PDF.
   String get visionSourceLabel =>

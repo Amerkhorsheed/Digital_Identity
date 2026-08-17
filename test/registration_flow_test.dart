@@ -2,13 +2,15 @@ import 'package:a_digital_id/app/app.dart';
 import 'package:a_digital_id/app/theme/app_theme.dart';
 import 'package:a_digital_id/features/idcard/id_result_page.dart';
 import 'package:a_digital_id/models/applicant.dart';
+import 'package:a_digital_id/models/biometric_capture.dart';
+import 'package:a_digital_id/services/biometric_service.dart';
 import 'package:a_digital_id/services/id_record_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-const _applicant = Applicant(
+final _applicant = Applicant(
   turnNumber: 'A-001',
   fullName: 'سارة محمد المزيد',
   birthYear: 2001,
@@ -19,7 +21,13 @@ const _applicant = Applicant(
   bloodType: BloodType.oPositive,
   rightEyeAcuity: VisualAcuity.twentyTwenty,
   leftEyeAcuity: VisualAcuity.twentyTwentyFive,
-  hasBiometric: true,
+  biometric: BiometricCapture(
+    method: BiometricMethod.fingerprint,
+    capturedAtUtc: DateTime.utc(2026, 8, 16, 9, 25),
+    sensorLabel: 'مستشعر بصمة الإصبع',
+    attestation:
+        '9f2a4c1b7e05d38a6c4b0f19d27e5a3c8b6104ff2d9e7a5c3b18604d7e2f9a1c',
+  ),
 );
 
 Future<void> _selectDropdown(
@@ -54,6 +62,35 @@ Future<void> _enterText(WidgetTester tester, int fieldIndex, String text) async 
   await tester.pumpAndSettle();
 }
 
+/// A device whose fingerprint sensor is present, enrolled, and matches.
+///
+/// Standing in for `BiometricPrompt` / Touch ID lets the test drive the real
+/// hardware branch of the panel — the branch that runs on a phone that has an
+/// enrolled finger — without a platform channel.
+class _EnrolledSensor extends BiometricService {
+  @override
+  Future<BiometricCapabilities> capabilities() async =>
+      BiometricCapabilities(
+        availability: BiometricAvailability.ready,
+        enrolledTypes: const [BiometricType.fingerprint],
+      );
+
+  @override
+  Future<BiometricAuthResult> authenticate({
+    required BiometricCapabilities capabilities,
+  }) async {
+    return BiometricAuthResult.success(
+      BiometricCapture(
+        method: BiometricMethod.fingerprint,
+        capturedAtUtc: DateTime.utc(2026, 8, 16, 9, 25),
+        sensorLabel: 'مستشعر بصمة الإصبع',
+        attestation:
+            '4d1e8b7a3c05f29d6b8e1047c3a95f2e8d7b6041a9c3e5f7b2d840196ace7f3b',
+      ),
+    );
+  }
+}
+
 void main() {
   setUpAll(() {
     sqfliteFfiInit();
@@ -67,7 +104,13 @@ void main() {
     addTearDown(tester.view.reset);
 
     final store = await tester.runAsync(() => IdRecordStore.open());
-    await tester.pumpWidget(ADigitalIdApp(storeOpener: () async => store!, enableDeepLinks: false));
+    await tester.pumpWidget(
+      ADigitalIdApp(
+        storeOpener: () async => store!,
+        enableDeepLinks: false,
+        biometricService: _EnrolledSensor(),
+      ),
+    );
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump(const Duration(milliseconds: 3400));
     await tester.pumpAndSettle();
@@ -115,7 +158,26 @@ void main() {
     expect(find.text('الصورة والبصمة البيومترية'), findsOneWidget);
     expect(find.text('التقاط صورة'), findsOneWidget);
     expect(find.text('اختيار من المكتبة'), findsNothing);
-    expect(find.text('المسح والتوثيق البيومتري الحقيقي'), findsOneWidget);
+    expect(find.text('التوثيق البيومتري'), findsOneWidget);
+
+    // The device this test simulates has an enrolled sensor, so the signed
+    // hardware match is offered alongside the pad.
+    expect(
+      find.text('مطابقة موقّعة عبر مستشعر بصمة الإصبع'),
+      findsOneWidget,
+    );
+
+    final scanButton = find.text('مطابقة موقّعة عبر مستشعر بصمة الإصبع');
+    await tester.ensureVisible(scanButton);
+    await tester.pumpAndSettle();
+    await tester.tap(scanButton);
+    await tester.pumpAndSettle();
+
+    // A successful match records its provenance, not just a boolean, and a
+    // signed hardware match is labelled as verified.
+    expect(find.text('موثقة'), findsOneWidget);
+    expect(find.text('بصمة إصبع — مستشعر الجهاز'), findsOneWidget);
+    expect(find.textContaining('4D1E-8B7A-3C05'), findsOneWidget);
 
     await tester.tap(find.text('إصدار بطاقة الهوية'));
     await tester.pumpAndSettle();
@@ -149,21 +211,17 @@ void main() {
     expect(find.text('البيانات المضمنة في الرمز'), findsNothing);
     expect(find.text('بدء تسجيل جديد'), findsOneWidget);
 
-    // The card opens on its front face and holds there — no endless spin.
-    expect(find.text('إظهار ظهر البطاقة'), findsOneWidget);
-    expect(find.byType(QrImageView), findsNothing);
-
-    await tester.tap(find.text('إظهار ظهر البطاقة'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 800));
-
-    expect(find.text('إظهار وجه البطاقة'), findsOneWidget);
+    // Both faces are open at once: nothing flips, and the QR is on screen
+    // from the first frame rather than hiding behind a back face.
+    expect(find.text('إظهار ظهر البطاقة'), findsNothing);
+    expect(find.text('إظهار وجه البطاقة'), findsNothing);
     expect(find.byType(QrImageView), findsOneWidget);
     expect(find.text('بيانات الهوية'), findsOneWidget);
+    expect(find.text('تكبير رمز المسح'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 3));
-    expect(find.text('إظهار وجه البطاقة'), findsOneWidget);
     expect(find.byType(QrImageView), findsOneWidget);
+    expect(find.text('بيانات الهوية'), findsOneWidget);
   });
 
   testWidgets('“بدء تسجيل جديد” returns to an empty step one', (tester) async {

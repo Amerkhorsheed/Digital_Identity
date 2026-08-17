@@ -1,4 +1,5 @@
 import 'package:a_digital_id/models/applicant.dart';
+import 'package:a_digital_id/models/biometric_capture.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -37,7 +38,7 @@ void main() {
   });
 
   group('Applicant', () {
-    const base = Applicant(
+    final base = Applicant(
       fullName: 'سارة محمد المزيد',
       birthYear: 2001,
       academicYear: AcademicYear.bachelor,
@@ -47,7 +48,11 @@ void main() {
       bloodType: BloodType.oPositive,
       rightEyeAcuity: VisualAcuity.twentyTwenty,
       leftEyeAcuity: VisualAcuity.twentyTwenty,
-      hasBiometric: true,
+      biometric: BiometricCapture(
+        method: BiometricMethod.fingerprint,
+        capturedAtUtc: DateTime.utc(2026, 8, 16, 9, 25),
+        sensorLabel: 'مستشعر بصمة الإصبع',
+      ),
       photoPath: '/tmp/photo.jpg',
     );
 

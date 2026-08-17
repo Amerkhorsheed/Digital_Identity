@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../config/verify_endpoint.dart';
 import '../models/applicant.dart';
+import '../models/biometric_capture.dart';
 import '../models/vision_test.dart';
 
 /// A decoded card retrieved from a QR scan or a deep link.
@@ -28,7 +30,7 @@ class ScannedCard {
 /// [version: 1 byte][flags: 1 byte][crc16: 2 bytes big-endian][body...]
 /// ```
 ///
-/// - `version`: `2` (the binary envelope format).
+/// - `version`: `3` (adds biometric provenance to the body).
 /// - `flags`: bit 0 = payload is gzip compressed.
 /// - `crc16`: CRC-16/CCITT-FALSE of `body`, rejecting truncated or corrupt scans.
 /// - `body`: UTF-8 JSON map encoded as base64url without padding.
@@ -38,7 +40,11 @@ abstract final class CardLink {
   static const String host = 'card';
 
   /// Binary format version. Incremented only when the frame layout changes.
-  static const int version = 2;
+  ///
+  /// Version 3 adds the biometric provenance keys (`pm`, `pq`, `ph`). A
+  /// version 2 code still decodes; it simply carries no provenance, so the
+  /// card shows the verification flag without the path that produced it.
+  static const int version = 3;
 
   static const int _flagGzip = 1 << 0;
 
@@ -84,6 +90,10 @@ abstract final class CardLink {
       't': issuedAtUtc.toUtc().millisecondsSinceEpoch ~/ 1000,
       if (applicant.visionTest != null)
         'm': applicant.visionTest!.distanceCm.round(),
+      // Biometric provenance, packed into one field to keep the QR symbol
+      // small: `method.secondsBeforeIssue.attestation12`.
+      if (applicant.biometric != null)
+        'pb': _packBiometric(applicant.biometric!, issuedAtUtc),
     };
 
     final json = utf8.encode(jsonEncode(map));
@@ -161,7 +171,6 @@ abstract final class CardLink {
     final right = VisualAcuity.values[_index(map['r'], VisualAcuity.values)];
     final left = VisualAcuity.values[_index(map['l'], VisualAcuity.values)];
     final distance = map['m'] as int?;
-    final hasBiometric = (map['p'] as int? ?? 1) == 1;
 
     final applicant = Applicant(
       fullName: fullName,
@@ -174,7 +183,7 @@ abstract final class CardLink {
       bloodType: BloodType.values[_index(map['b'], BloodType.values)],
       rightEyeAcuity: right,
       leftEyeAcuity: left,
-      hasBiometric: hasBiometric,
+      biometric: _biometricFrom(map, issuedAt),
       visionTest: distance == null
           ? null
           : VisionTestReport.decoded(
@@ -189,6 +198,56 @@ abstract final class CardLink {
       applicant: applicant,
       personalId: personalId,
       issuedAt: issuedAt,
+    );
+  }
+
+  /// Packs the biometric record into `method.age.quality.attestation12`.
+  ///
+  /// The capture time is stored as seconds *before* issue rather than as an
+  /// absolute stamp — it is always a small number, which keeps the field short.
+  /// Quality is `-1` for a hardware match, which either succeeds or fails and
+  /// so has no intermediate score. The attestation is truncated to 12 hex
+  /// characters; 48 bits is ample to tie a scanned card back to its record.
+  static String _packBiometric(BiometricCapture capture, DateTime issuedAtUtc) {
+    final age = issuedAtUtc.toUtc().difference(capture.capturedAtUtc).inSeconds;
+    final hash = capture.attestation ?? '';
+    return '${capture.method.index}'
+        '.${math.max(0, age)}'
+        '.${capture.qualityScore ?? -1}'
+        '.${hash.substring(0, math.min(12, hash.length))}';
+  }
+
+  /// Rebuilds the biometric record from a scanned payload.
+  ///
+  /// Returns `null` for a version 2 code, which carries only the `p` flag and
+  /// no provenance — the honest reading of such a card is "we cannot tell how
+  /// this was verified", not an invented method.
+  static BiometricCapture? _biometricFrom(
+    Map<String, dynamic> map,
+    DateTime issuedAt,
+  ) {
+    final packed = map['pb'] as String?;
+    if (packed == null) return null;
+
+    final parts = packed.split('.');
+    if (parts.length < 3) return null;
+
+    final methodIndex = int.tryParse(parts[0]);
+    if (methodIndex == null ||
+        methodIndex < 0 ||
+        methodIndex >= BiometricMethod.values.length) {
+      return null;
+    }
+
+    final age = int.tryParse(parts[1]) ?? 0;
+    final quality = int.tryParse(parts[2]) ?? -1;
+    final hash = parts.length > 3 ? parts[3] : '';
+
+    return BiometricCapture(
+      method: BiometricMethod.values[methodIndex],
+      capturedAtUtc: issuedAt.subtract(Duration(seconds: age)),
+      attestation: hash.isEmpty ? null : hash,
+      qualityScore: quality < 0 ? null : quality.clamp(0, 100),
     );
   }
 

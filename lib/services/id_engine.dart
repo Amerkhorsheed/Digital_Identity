@@ -29,7 +29,10 @@ abstract final class IdEngine {
         '|${applicant.academicYear.label}|${applicant.governorate}|${applicant.bloodType.label}'
         '|${applicant.heightCm}|${applicant.weightKg}'
         '|${applicant.rightEyeAcuity.label}|${applicant.leftEyeAcuity.label}'
-        '|${applicant.hasBiometric}';
+        // ربط الرقم الشخصي بسجلّ المطابقة نفسه — لا بمجرّد وجودها — حتى
+        // يتغيّر الرقم إذا تغيّرت وسيلة التوثيق أو لحظتها.
+        '|${applicant.biometric?.method.code ?? 'none'}'
+        '|${applicant.biometric?.attestation ?? ''}';
     final payload = utf8.encode('$canonical|${issuedAtUtc.toIso8601String()}|$salt');
     final hash = await Sha256().hash(payload);
 
@@ -68,7 +71,10 @@ abstract final class IdEngine {
       'bloodType': applicant.bloodType.label,
       'rightEye': applicant.rightEyeAcuity.label,
       'leftEye': applicant.leftEyeAcuity.label,
-      'biometric': applicant.hasBiometric ? 'موثقة' : 'غير مسجلة',
+      'biometric': applicant.biometricStatusLabel,
+      // تفاصيل مصدر التوثيق: أي مسار، ومتى، وبأي جودة، وبصمة القالب.
+      if (applicant.biometric != null)
+        'biometricDetail': applicant.biometric!.toJson(),
       'visionSource': applicant.visionSourceLabel,
       'issuedBy': 'الهوية الرقمية — أ',
     };
