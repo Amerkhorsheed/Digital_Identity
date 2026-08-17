@@ -9,8 +9,8 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 const _applicant = Applicant(
   firstName: 'Sara',
   lastName: 'Almaziad',
-  academicYear: AcademicYear.third,
-  degree: UndergraduateDegree.bcs,
+  academicYear: AcademicYear.bachelor,
+  degree: UndergraduateDegree.engineering,
   governorate: 'دمشق',
   city: 'المزة',
   heightCm: 165,

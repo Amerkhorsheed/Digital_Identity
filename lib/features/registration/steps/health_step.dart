@@ -426,13 +426,22 @@ class _AcuityTile extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: 4),
-          Text(
-            acuity.label,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontFamily: 'SpaceMono',
-                  color: BrandColors.goldDeep,
-                  fontWeight: FontWeight.w700,
-                ),
+          // «أسوأ من 20/200» تسمية عربية طويلة و SpaceMono لا يحمل حروفًا
+          // عربية، فتُترك لخط الواجهة وتُصغَّر بدل أن تفيض عن البطاقة.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              acuity.label,
+              maxLines: 1,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontFamily: acuityLineFor(acuity) != null
+                        ? 'SpaceMono'
+                        : null,
+                    color: BrandColors.goldDeep,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
           ),
         ],
       ),

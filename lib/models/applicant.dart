@@ -2,14 +2,14 @@ import 'package:flutter/foundation.dart';
 
 import 'vision_test.dart';
 
-/// المرحلة الدراسية للمتقدّم.
+/// المرحلة الدراسية / المؤهل العلمي للمتقدّم.
 enum AcademicYear {
-  first('السنة الأولى'),
-  second('السنة الثانية'),
-  third('السنة الثالثة'),
-  fourth('السنة الرابعة'),
-  fifth('السنة الخامسة'),
-  graduate('خريج / دراسات عليا');
+  bachelor('إجازة جامعية (بكالوريوس)'),
+  diploma('دبلوم معهد تقاني'),
+  master('ماجستير'),
+  phd('دكتوراه'),
+  secondary('الشهادة الثانوية'),
+  other('أخرى');
 
   const AcademicYear(this.label);
   final String label;
@@ -23,15 +23,14 @@ enum AcademicYear {
   }
 }
 
-/// الدرجة الجامعية للمتقدّم.
+/// التخصص الدراسي / المجال الأكاديمي للمتقدّم.
 enum UndergraduateDegree {
-  bsc('بكالوريوس علوم'),
-  ba('بكالوريوس آداب'),
-  beng('بكالوريوس هندسة'),
-  bba('بكالوريوس إدارة أعمال'),
-  bcs('بكالوريوس علوم الحاسب'),
-  md('بكالوريوس طب'),
-  pharm('بكالوريوس صيدلة'),
+  engineering('هندسة وتكنولوجيا'),
+  medical('علوم طبية وصحية'),
+  business('اقتصاد وإدارة أعمال'),
+  law('حقوق وعلوم سياسية'),
+  arts('آداب وعلوم إنسانية'),
+  science('علوم أساسية'),
   other('أخرى');
 
   const UndergraduateDegree(this.label);
@@ -81,7 +80,13 @@ enum VisualAcuity {
   twentyFifty('20/50'),
   twentySeventy('20/70'),
   twentyHundred('20/100'),
-  twentyTwoHundred('20/200');
+  twentyTwoHundred('20/200'),
+
+  /// أضعف من أعلى سطر في اللوحة — لم يُجتَز سطر 20/200 نفسه.
+  ///
+  /// تُلحَق آخر القائمة عن قصد: رمز QR يخزّن ترتيب القيمة لا نصّها، فإدراجها
+  /// في الوسط يُفسد كل بطاقة مطبوعة سابقًا.
+  worseThanTwentyTwoHundred('أسوأ من 20/200');
 
   const VisualAcuity(this.label);
   final String label;

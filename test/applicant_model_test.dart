@@ -56,8 +56,8 @@ void main() {
     const base = Applicant(
       firstName: 'Sara',
       lastName: 'Almaziad',
-      academicYear: AcademicYear.third,
-      degree: UndergraduateDegree.bcs,
+      academicYear: AcademicYear.bachelor,
+      degree: UndergraduateDegree.engineering,
       governorate: 'دمشق',
       city: 'المزة',
       heightCm: 165,
@@ -81,8 +81,8 @@ void main() {
       const seat = Applicant(
         firstName: 'A',
         lastName: 'B',
-        academicYear: AcademicYear.first,
-        degree: UndergraduateDegree.ba,
+        academicYear: AcademicYear.bachelor,
+        degree: UndergraduateDegree.arts,
         governorate: 'حلب',
         city: 'حلب',
         heightCm: 170,
@@ -103,7 +103,7 @@ void main() {
       const other = Applicant(
         firstName: 'A',
         lastName: 'B',
-        academicYear: AcademicYear.first,
+        academicYear: AcademicYear.bachelor,
         degree: UndergraduateDegree.other,
         customDegree: 'B.A. Fine Arts',
         governorate: 'حلب',
@@ -123,8 +123,8 @@ void main() {
       const noPhoto = Applicant(
         firstName: 'A',
         lastName: 'B',
-        academicYear: AcademicYear.first,
-        degree: UndergraduateDegree.ba,
+        academicYear: AcademicYear.bachelor,
+        degree: UndergraduateDegree.arts,
         governorate: 'حمص',
         city: 'تدمر',
         heightCm: 170,

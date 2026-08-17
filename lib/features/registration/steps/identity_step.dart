@@ -94,7 +94,7 @@ class _IdentityStepState extends State<IdentityStep> {
               onChanged: (value) => _update(() => draft.academicYear = value),
             ),
             BrandDropdown<UndergraduateDegree>(
-              label: 'الدرجة الجامعية',
+              label: 'التخصص الدراسي',
               value: draft.degree,
               items: UndergraduateDegree.values,
               labelFor: (degree) => degree.label,
@@ -104,7 +104,7 @@ class _IdentityStepState extends State<IdentityStep> {
             ),
             if (degree == UndergraduateDegree.other)
               BrandTextField(
-                label: 'تخصصك الدراسي',
+                label: 'اكتب تخصصك بالتحديد',
                 controller: _customDegree,
                 icon: Icons.edit_note_rounded,
                 error: widget.errors['customDegree'],

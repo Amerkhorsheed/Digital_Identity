@@ -16,8 +16,8 @@ final _report = VisionTestReport.decoded(
 final _applicant = Applicant(
   firstName: 'سارة',
   lastName: 'الحلبي',
-  academicYear: AcademicYear.third,
-  degree: UndergraduateDegree.bcs,
+  academicYear: AcademicYear.bachelor,
+  degree: UndergraduateDegree.engineering,
   governorate: 'ريف دمشق',
   city: 'دوما',
   heightCm: 165,
@@ -99,8 +99,8 @@ void main() {
     expect(card.personalId, _id);
     expect(card.issuedAt, _issuedAt);
     expect(card.applicant.fullName, 'سارة الحلبي');
-    expect(card.applicant.academicYear, AcademicYear.third);
-    expect(card.applicant.degreeLabel, 'بكالوريوس علوم الحاسب');
+    expect(card.applicant.academicYear, AcademicYear.bachelor);
+    expect(card.applicant.degreeLabel, 'هندسة وتكنولوجيا');
     expect(card.applicant.governorate, 'ريف دمشق');
     expect(card.applicant.city, 'دوما');
     expect(card.applicant.placeLabel, 'دوما، ريف دمشق');
@@ -117,9 +117,9 @@ void main() {
     final custom = Applicant(
       firstName: 'عمر',
       lastName: 'الحداد',
-      academicYear: AcademicYear.first,
+      academicYear: AcademicYear.bachelor,
       degree: UndergraduateDegree.other,
-      customDegree: 'بكالوريوس فنون جميلة',
+      customDegree: 'فنون جميلة',
       governorate: 'حلب',
       city: 'منبج',
       heightCm: 180,
@@ -132,7 +132,7 @@ void main() {
 
     final card = CardLink.decode(_encode(custom))!;
     expect(card.applicant.degree, UndergraduateDegree.other);
-    expect(card.applicant.degreeLabel, 'بكالوريوس فنون جميلة');
+    expect(card.applicant.degreeLabel, 'فنون جميلة');
   });
 
   test('marks a manually entered acuity as such', () {

@@ -11,8 +11,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 const _applicant = Applicant(
   firstName: 'سارة',
   lastName: 'المزيد',
-  academicYear: AcademicYear.third,
-  degree: UndergraduateDegree.bcs,
+  academicYear: AcademicYear.bachelor,
+  degree: UndergraduateDegree.engineering,
   governorate: 'دمشق',
   city: 'المزة',
   heightCm: 165,
@@ -77,8 +77,8 @@ void main() {
     expect(find.text('الهوية الشخصية'), findsOneWidget);
     await _enterText(tester, 0, 'سارة');
     await _enterText(tester, 1, 'المزيد');
-    await _selectDropdown(tester, 'المرحلة الدراسية', 'السنة الثالثة');
-    await _selectDropdown(tester, 'الدرجة الجامعية', 'بكالوريوس علوم الحاسب');
+    await _selectDropdown(tester, 'المرحلة الدراسية', 'إجازة جامعية (بكالوريوس)');
+    await _selectDropdown(tester, 'التخصص الدراسي', 'هندسة وتكنولوجيا');
     await _selectDropdown(tester, 'المحافظة', 'دمشق');
 
     // The city picker is a searchable sheet, not a dropdown.

@@ -105,8 +105,8 @@ void main() {
     // Step 1
     await _enterText(tester, 0, 'سارة');
     await _enterText(tester, 1, 'الحلبي');
-    await _selectDropdown(tester, 'المرحلة الدراسية', 'السنة الثالثة');
-    await _selectDropdown(tester, 'الدرجة الجامعية', 'بكالوريوس علوم الحاسب');
+    await _selectDropdown(tester, 'المرحلة الدراسية', 'إجازة جامعية (بكالوريوس)');
+    await _selectDropdown(tester, 'التخصص الدراسي', 'هندسة وتكنولوجيا');
     await _selectDropdown(tester, 'المحافظة', 'ريف دمشق');
     await _tapText(tester, 'اختر المدينة');
     await tester.tap(find.text('دوما').last);

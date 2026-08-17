@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/theme/brand_colors.dart';
+import '../../models/applicant.dart';
 import '../../models/vision_test.dart';
 import '../../shared/widgets/adaptive_layout.dart';
 import '../../shared/widgets/animations.dart';
@@ -16,10 +17,14 @@ enum _Stage { setup, brief, testing, summary }
 
 /// فحص نظر تفاعلي حقيقي بلوحة «E المتدحرج».
 ///
-/// خمسة أسطر متدرّجة (20/200 → 20/20) مثل لوحة العيادة تمامًا؛ في كل سطر
-/// ثلاثة رموز بزوايا عشوائية، ويُجتاز السطر بإجابتين صحيحتين. حجم كل رمز
-/// يُحسب بالمليمتر من الزاوية البصرية ومسافة الفحص وقياس الشاشة المُعايَر،
-/// فتكون النتيجة مكافئة سريريًا لا مجرد اختيار من قائمة.
+/// ثمانية أسطر بتدرّج سنيلن الكامل (20/200 → 20/20)؛ في كل سطر أربعة رموز
+/// بزوايا عشوائية موحّدة، ويُجتاز السطر بثلاث إجابات صحيحة — بروتوكول
+/// Peek Acuity. حجم كل رمز يُحسب بالمليمتر من الزاوية البصرية ومسافة الفحص
+/// وقياس الشاشة المُعايَر، والأسطر التي تعجز دقة الشاشة عن رسمها تُقتطع من
+/// اللوحة بدلًا من عرضها كلطخة رمادية.
+///
+/// لا يُخبر الفحص المفحوص بصحة أي إجابة، ولا يستثني الاتجاه السابق من
+/// الاحتمالات: كلا الأمرين كان يسمح باستنتاج الإجابة بدل رؤيتها.
 class EyeTestPage extends StatefulWidget {
   const EyeTestPage({super.key});
 
@@ -40,11 +45,19 @@ class EyeTestPage extends StatefulWidget {
 class _EyeTestPageState extends State<EyeTestPage> {
   static const List<double> _distances = [40, 100, 200, 300];
 
+  /// فترة التعمية بين رمزين.
+  static const Duration _maskDuration = Duration(milliseconds: 350);
+
   final math.Random _random = math.Random();
 
   _Stage _stage = _Stage.setup;
   double _pxPerMm = ScreenCalibration.initialGuess();
   double _distanceCm = 40;
+
+  /// اللوحة المعروضة فعلًا: أسطر [kAcuityLines] التي تكفيها دقة هذه الشاشة
+  /// على المسافة المختارة. تُحسب مرة واحدة عند بدء الفحص فتبقى العينان على
+  /// اللوحة نفسها.
+  List<AcuityLine> _lines = kAcuityLines;
 
   EyeSide _eye = EyeSide.right;
   int _lineIndex = 0;
@@ -54,26 +67,38 @@ class _EyeTestPageState extends State<EyeTestPage> {
   int _answeredTotal = 0;
   int _bestLine = -1;
   EDirection _direction = EDirection.right;
-  EDirection? _lastAnswer;
-  bool _showFeedback = false;
+
+  /// فترة تعمية قصيرة بين رمزين، تمنع مقارنة الرمز الجديد ببقايا السابق.
+  /// لا تحمل أي إشارة إلى صحة الإجابة.
+  bool _masking = false;
 
   final Map<EyeSide, EyeResult> _results = {};
 
   @override
   void initState() {
     super.initState();
-    _direction = _randomDirection(null);
+    _direction = _randomDirection();
   }
 
-  EDirection _randomDirection(EDirection? avoid) {
-    final options = [
-      for (final d in EDirection.values)
-        if (d != avoid) d,
-    ];
-    return options[_random.nextInt(options.length)];
-  }
+  /// اتجاه عشوائي موحّد من أصل أربعة.
+  ///
+  /// بلا استثناء للاتجاه السابق: استثناؤه كان يُسقط احتمالًا من الأربعة، فيرفع
+  /// فرصة التخمين الأعمى من 25% إلى 33% لمن يلاحظ أن الاتجاه لا يتكرر أبدًا.
+  EDirection _randomDirection() =>
+      EDirection.values[_random.nextInt(EDirection.values.length)];
 
   // ---------------------------------------------------------------- الفحص
+
+  /// يثبّت المعايرة، يبني اللوحة القابلة للعرض، ثم يبدأ بالعين اليمنى.
+  void _beginTest() {
+    ScreenCalibration.set(_pxPerMm);
+    _lines = renderableAcuityLines(
+      pxPerMm: _pxPerMm,
+      distanceCm: _distanceCm,
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    );
+    _startEye(EyeSide.right);
+  }
 
   void _startEye(EyeSide side) {
     setState(() {
@@ -82,14 +107,14 @@ class _EyeTestPageState extends State<EyeTestPage> {
       _shownInLine = 0;
       _correctInLine = 0;
       _bestLine = -1;
-      _direction = _randomDirection(null);
-      _showFeedback = false;
+      _direction = _randomDirection();
+      _masking = false;
       _stage = _Stage.brief;
     });
   }
 
   void _answer(EDirection? answer) {
-    if (_showFeedback) return;
+    if (_masking) return;
 
     final correct = answer == _direction;
     _answeredTotal++;
@@ -99,13 +124,10 @@ class _EyeTestPageState extends State<EyeTestPage> {
       _correctTotal++;
     }
 
-    setState(() {
-      _lastAnswer = answer;
-      _showFeedback = true;
-    });
-
-    // ومضة تأكيد قصيرة، ثم الرمز التالي — تمامًا كإيقاع الفحص في العيادة.
-    Future.delayed(const Duration(milliseconds: 260), () {
+    // تعمية قصيرة ثم الرمز التالي — بلا لون ولا علامة. إخبار المفحوص بصحة كل
+    // إجابة يجعله يستدل على الأنماط ويعدّل تخمينه، ولا لوحة عيادة تفعل ذلك.
+    setState(() => _masking = true);
+    Future.delayed(_maskDuration, () {
       if (!mounted) return;
       _advance();
     });
@@ -114,21 +136,19 @@ class _EyeTestPageState extends State<EyeTestPage> {
   void _advance() {
     final wrongInLine = _shownInLine - _correctInLine;
     final linePassed = _correctInLine >= kCorrectToPass;
-    final lineFailed = wrongInLine > kOptotypesPerLine - kCorrectToPass;
-    final lineComplete = linePassed || lineFailed;
+    final lineFailed = wrongInLine >= kWrongToFail;
 
-    if (!lineComplete) {
+    if (!linePassed && !lineFailed) {
       setState(() {
-        _showFeedback = false;
-        _lastAnswer = null;
-        _direction = _randomDirection(_direction);
+        _masking = false;
+        _direction = _randomDirection();
       });
       return;
     }
 
     if (linePassed) _bestLine = _lineIndex;
 
-    final isLastLine = _lineIndex == kAcuityLines.length - 1;
+    final isLastLine = _lineIndex == _lines.length - 1;
     if (lineFailed || isLastLine) {
       _finishEye();
       return;
@@ -138,21 +158,23 @@ class _EyeTestPageState extends State<EyeTestPage> {
       _lineIndex++;
       _shownInLine = 0;
       _correctInLine = 0;
-      _showFeedback = false;
-      _lastAnswer = null;
-      _direction = _randomDirection(_direction);
+      _masking = false;
+      _direction = _randomDirection();
     });
   }
 
   void _finishEye() {
-    // إن لم يُجتَز أي سطر تُسجَّل أدنى درجة في اللوحة.
-    final line = _bestLine >= 0 ? kAcuityLines[_bestLine] : kAcuityLines.first;
+    // لم يُجتَز أي سطر: لا يجوز نسبة قيمة أعلى سطر إلى من لم يقرأه.
+    final acuity = _bestLine >= 0
+        ? _lines[_bestLine].acuity
+        : VisualAcuity.worseThanTwentyTwoHundred;
     _results[_eye] = EyeResult(
       side: _eye,
-      acuity: line.acuity,
+      acuity: acuity,
       correctAnswers: _correctTotal,
       totalAnswers: _answeredTotal,
       passedLines: _bestLine + 1,
+      linesPresented: _lines.length,
     );
 
     if (_eye == EyeSide.right) {
@@ -169,6 +191,7 @@ class _EyeTestPageState extends State<EyeTestPage> {
       _results.clear();
       _correctTotal = 0;
       _answeredTotal = 0;
+      _lines = kAcuityLines;
       _stage = _Stage.setup;
     });
   }
@@ -246,7 +269,7 @@ class _EyeTestPageState extends State<EyeTestPage> {
               const _SectionTitle(
                 icon: Icons.checklist_rounded,
                 title: 'قبل أن نبدأ',
-                subtitle: 'أربع تعليمات سريعة لنتيجة دقيقة.',
+                subtitle: 'تعليمات سريعة لنتيجة دقيقة.',
               ),
               const _InstructionsCard(),
               Padding(
@@ -255,10 +278,7 @@ class _EyeTestPageState extends State<EyeTestPage> {
                   label: 'ابدأ فحص العين اليمنى',
                   icon: Icons.play_arrow_rounded,
                   large: true,
-                  onPressed: () {
-                    ScreenCalibration.set(_pxPerMm);
-                    _startEye(EyeSide.right);
-                  },
+                  onPressed: _beginTest,
                 ),
               ),
             ],
@@ -324,7 +344,7 @@ class _EyeTestPageState extends State<EyeTestPage> {
   // -------------------------------------------------------------- اللوحة
 
   Widget _buildTesting() {
-    final line = kAcuityLines[_lineIndex];
+    final line = _lines[_lineIndex];
     final band = Adaptive.bandOf(context);
     final optotypePx = line.optotypeHeightMm(_distanceCm) * _pxPerMm;
 
@@ -334,7 +354,7 @@ class _EyeTestPageState extends State<EyeTestPage> {
       children: [
         _LineProgress(
           lineIndex: _lineIndex,
-          totalLines: kAcuityLines.length,
+          totalLines: _lines.length,
           line: line,
           shown: _shownInLine,
           eye: _eye,
@@ -343,12 +363,11 @@ class _EyeTestPageState extends State<EyeTestPage> {
           child: _ChartSurface(
             optotypePx: optotypePx,
             direction: _direction,
-            showFeedback: _showFeedback,
-            correct: _lastAnswer == _direction,
+            masking: _masking,
           ),
         ),
         _DirectionPad(
-          enabled: !_showFeedback,
+          enabled: !_masking,
           band: band,
           onAnswer: _answer,
           onCannotSee: () => _answer(null),
@@ -406,8 +425,10 @@ class _EyeTestPageState extends State<EyeTestPage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'أُجري الفحص على مسافة ${_distanceCm.round()} سم '
-                    'بلوحة E المتدحرج المكوّنة من ${kAcuityLines.length} أسطر.',
+                    'مسافة ${_distanceCm.round()} سم · لوحة E المتدحرج '
+                    '(${_lines.length} من ${kAcuityLines.length} أسطر) · '
+                    '$kCorrectToPass إجابات صحيحة من $kOptotypesPerLine '
+                    'لاجتياز السطر.',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: BrandColors.inkMuted,
@@ -511,7 +532,7 @@ class _TestHeader extends StatelessWidget {
                   ),
             ),
           ),
-          const GoldChip(label: 'Snellen', icon: Icons.visibility_outlined),
+          const GoldChip(label: 'Tumbling E', icon: Icons.visibility_outlined),
         ],
       ),
     );
@@ -667,7 +688,13 @@ class _DistanceSelector extends StatelessWidget {
               label: distances[i] < 100
                   ? '${distances[i].round()} سم'
                   : '${(distances[i] / 100).toStringAsFixed(0)} م',
-              caption: distances[i] == 40 ? 'قياسي' : 'لوحة',
+              // 3 م هي مسافة لوحة العيادة؛ 40 سم مسافة قراءة قريبة تعجز فيها
+              // معظم الشاشات عن رسم أدقّ الأسطر.
+              caption: switch (distances[i]) {
+                40.0 => 'قريب',
+                300.0 => 'قياسي',
+                _ => 'بعيد',
+              },
               selected: selected == distances[i],
               onTap: () => onChanged(distances[i]),
             ),
@@ -743,7 +770,10 @@ class _ChoiceChipTile extends StatelessWidget {
   }
 }
 
-/// تنبيه عندما تصبح رموز أدق سطر أصغر من قدرة الشاشة على رسمها.
+/// يعلن مدى اللوحة الذي تستطيع هذه الشاشة قياسه فعلًا على المسافة المختارة.
+///
+/// الأسطر الأدقّ من قدرة الشاشة تُقتطع ولا تُعرض، لأن رمزًا سماكة ضلعه أقل من
+/// بكسل فيزيائي واحد يقيس حدّة الشاشة لا حدّة العين.
 class _FeasibilityNote extends StatelessWidget {
   const _FeasibilityNote({required this.pxPerMm, required this.distanceCm});
 
@@ -752,19 +782,20 @@ class _FeasibilityNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final finest = kAcuityLines.last;
-    final logicalPx = finest.optotypeHeightMm(distanceCm) * pxPerMm;
-    final devicePx = logicalPx * MediaQuery.devicePixelRatioOf(context);
-    // سماكة ضلع الحرف تساوي خُمس ارتفاعه؛ دون بكسل واحد لا يمكن رسمه بدقة.
-    final crisp = devicePx / 5 >= 1.0;
+    final lines = renderableAcuityLines(
+      pxPerMm: pxPerMm,
+      distanceCm: distanceCm,
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    );
+    final full = lines.length == kAcuityLines.length;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: crisp ? BrandColors.pineMist : const Color(0xFFFDF3E7),
+        color: full ? BrandColors.pineMist : const Color(0xFFFDF3E7),
         borderRadius: BorderRadius.circular(BrandRadii.medium),
         border: Border.all(
-          color: crisp
+          color: full
               ? BrandColors.pineSoft
               : BrandColors.goldDeep.withValues(alpha: 0.45),
         ),
@@ -773,19 +804,22 @@ class _FeasibilityNote extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            crisp ? Icons.verified_rounded : Icons.info_outline_rounded,
+            full ? Icons.verified_rounded : Icons.info_outline_rounded,
             size: 20,
-            color: crisp ? BrandColors.success : BrandColors.goldDeep,
+            color: full ? BrandColors.success : BrandColors.goldDeep,
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              crisp
-                  ? 'الشاشة قادرة على عرض أدق سطر (20/20) بدقة كاملة على هذه المسافة.'
-                  : 'على هذه المسافة يصبح سطر 20/20 أدق مما تستطيع الشاشة رسمه '
-                      'بوضوح. زد المسافة للحصول على نتيجة أدق.',
+              full
+                  ? 'هذه الشاشة تعرض أسطر اللوحة الـ${kAcuityLines.length} '
+                      'كاملةً حتى 20/20 على هذه المسافة.'
+                  : 'على هذه المسافة تعجز الشاشة عن رسم ما هو أدقّ من '
+                      '${lines.last.label}، فستتوقف اللوحة عند هذا السطر '
+                      '(${lines.length} من ${kAcuityLines.length} أسطر). '
+                      'زد المسافة لقياس الأسطر الأدقّ.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: crisp ? BrandColors.pine : BrandColors.goldDeep,
+                    color: full ? BrandColors.pine : BrandColors.goldDeep,
                     height: 1.6,
                   ),
             ),
@@ -805,7 +839,17 @@ class _InstructionsCard extends StatelessWidget {
       (Icons.pan_tool_outlined, 'غطِّ العين غير المفحوصة بكفّ يدك دون ضغط.'),
       (Icons.light_mode_outlined, 'اجلس في إضاءة جيدة بلا انعكاس على الشاشة.'),
       (Icons.visibility_outlined, 'حدّد الجهة التي تفتح نحوها أضلاع الحرف E.'),
-      (Icons.touch_app_outlined, 'إن لم تتمكن من التمييز اختر «لا أستطيع».'),
+      // الاختيار القسري جزء من البروتوكول: التخمين عند الشك يقيس أفضل مما
+      // يقيسه الامتناع، و«لا أستطيع» للعجز الحقيقي عن رؤية الرمز أصلًا.
+      (Icons.help_outline_rounded, 'إن ترددت فخمّن أقرب اتجاه؛ لا تمتنع.'),
+      (
+        Icons.visibility_off_outlined,
+        'إن لم ترَ الرمز إطلاقًا اختر «لا أستطيع التمييز».',
+      ),
+      (
+        Icons.do_not_disturb_on_outlined,
+        'لن يخبرك الفحص بصحة إجاباتك — كلوحة العيادة تمامًا.',
+      ),
     ];
 
     return SectionCard(
@@ -1083,14 +1127,15 @@ class _ChartSurface extends StatelessWidget {
   const _ChartSurface({
     required this.optotypePx,
     required this.direction,
-    required this.showFeedback,
-    required this.correct,
+    required this.masking,
   });
 
   final double optotypePx;
   final EDirection direction;
-  final bool showFeedback;
-  final bool correct;
+
+  /// فترة التعمية بين رمزين: يُخفى الرمز تمامًا لا يُبهَت، فلا يبقى منه أثر
+  /// يُقارَن به الرمز التالي.
+  final bool masking;
 
   @override
   Widget build(BuildContext context) {
@@ -1100,12 +1145,8 @@ class _ChartSurface extends StatelessWidget {
         // لوحة بيضاء خالصة بأعلى تباين ممكن، تمامًا كلوحة العيادة.
         color: Colors.white,
         borderRadius: BorderRadius.circular(BrandRadii.large),
-        border: Border.all(
-          color: showFeedback
-              ? (correct ? BrandColors.success : BrandColors.error)
-              : BrandColors.outlineSoft,
-          width: showFeedback ? 2 : 1,
-        ),
+        // إطار ثابت اللون والسماكة: أي تغيّر فيه بعد الإجابة يكشف صحتها.
+        border: Border.all(color: BrandColors.outlineSoft),
         boxShadow: [
           BoxShadow(
             color: BrandColors.pine.withValues(alpha: 0.07),
@@ -1116,8 +1157,8 @@ class _ChartSurface extends StatelessWidget {
       ),
       child: Center(
         child: AnimatedOpacity(
-          opacity: showFeedback ? 0.25 : 1,
-          duration: const Duration(milliseconds: 140),
+          opacity: masking ? 0 : 1,
+          duration: const Duration(milliseconds: 110),
           child: TumblingE(
             key: const ValueKey('chart-optotype'),
             // يُرسم بحجمه الحقيقي دون أي تكبير — هذه هي دقة الفحص.
@@ -1285,14 +1326,22 @@ class _ResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final line = kAcuityLines.firstWhere((l) => l.acuity == result.acuity);
-    final normal = line.snellenDenominator <= 20;
-    final mild = line.snellenDenominator <= 50;
-    final verdict = normal
-        ? 'إبصار طبيعي'
-        : mild
-            ? 'ضعف بسيط — يُنصح بمراجعة مختص'
-            : 'ضعف واضح — راجع طبيب عيون';
+    // `null` عندما لم يُجتَز أي سطر: النتيجة تحت اللوحة ولا مقام سنيلن لها.
+    final line = acuityLineFor(result.acuity);
+    final denominator = line?.snellenDenominator;
+    final verdict = switch (denominator) {
+      null => 'أضعف من أعلى سطر — راجع طبيب عيون',
+      <= 25 => 'إبصار طبيعي',
+      <= 40 => 'ضعف بسيط — يُنصح بمراجعة مختص',
+      <= 70 => 'ضعف متوسط — راجع طبيب عيون',
+      _ => 'ضعف واضح — راجع طبيب عيون',
+    };
+    final normal = denominator != null && denominator <= 25;
+
+    // اجتاز كل سطر معروض ولوحةُ الشاشة مقتطعة: القياس محدود بالشاشة، وقد
+    // يكون الإبصار الحقيقي أفضل من الرقم المكتوب.
+    final atScreenLimit =
+        result.cappedByScreen && result.passedLines == result.linesPresented;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1349,22 +1398,26 @@ class _ResultCard extends StatelessWidget {
               textBaseline: TextBaseline.alphabetic,
               children: [
                 Text(
-                  line.label,
+                  result.acuity.label,
                   maxLines: 1,
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontFamily: 'SpaceMono',
+                        // SpaceMono لا يحمل حروفًا عربية، وتسمية «تحت اللوحة»
+                        // عربية — فتُترك لخط الواجهة.
+                        fontFamily: line != null ? 'SpaceMono' : null,
                         color: BrandColors.goldDeep,
                         fontWeight: FontWeight.w700,
                       ),
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  '(${line.decimal.toStringAsFixed(2)})',
-                  maxLines: 1,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: BrandColors.inkMuted,
-                      ),
-                ),
+                if (line != null) ...[
+                  const SizedBox(width: 10),
+                  Text(
+                    '(${line.decimal.toStringAsFixed(2)})',
+                    maxLines: 1,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: BrandColors.inkMuted,
+                        ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1376,6 +1429,17 @@ class _ResultCard extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
           ),
+          if (atScreenLimit) ...[
+            const SizedBox(height: 6),
+            Text(
+              'توقفت اللوحة عند هذا السطر لحدود دقة الشاشة؛ قد يكون الإبصار '
+              'أفضل مما يظهر.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: BrandColors.inkMuted,
+                    height: 1.5,
+                  ),
+            ),
+          ],
           const SizedBox(height: 14),
           const Divider(height: 1),
           const SizedBox(height: 12),
@@ -1384,7 +1448,7 @@ class _ResultCard extends StatelessWidget {
               Expanded(
                 child: _Metric(
                   label: 'أسطر مجتازة',
-                  value: '${result.passedLines}/${kAcuityLines.length}',
+                  value: '${result.passedLines}/${result.linesPresented}',
                 ),
               ),
               Expanded(
@@ -1454,8 +1518,10 @@ class _MedicalDisclaimer extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'هذا فحص استرشادي لحدة الإبصار ولا يُغني عن الفحص الطبي الكامل '
-              'لدى طبيب العيون.',
+              'فحص استرشادي لحدة الإبصار وحدها. يُعرض الرمز منفردًا بلا رموز '
+              'مجاورة، فقد تأتي النتيجة أفضل قليلًا من لوحة العيادة، وهو لا '
+              'يقيس حَوَل العين ولا عمى الألوان ولا ضغطها. لا يُغني عن فحص '
+              'طبيب العيون.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: BrandColors.goldDeep,
                     height: 1.6,

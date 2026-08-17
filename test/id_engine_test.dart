@@ -7,8 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 const _applicant = Applicant(
   firstName: 'Sara',
   lastName: 'Almaziad',
-  academicYear: AcademicYear.third,
-  degree: UndergraduateDegree.bcs,
+  academicYear: AcademicYear.bachelor,
+  degree: UndergraduateDegree.engineering,
   governorate: 'دمشق',
   city: 'المزة',
   heightCm: 165,
@@ -41,8 +41,8 @@ void main() {
         const Applicant(
           firstName: 'Omar',
           lastName: 'Haddad',
-          academicYear: AcademicYear.first,
-          degree: UndergraduateDegree.beng,
+          academicYear: AcademicYear.master,
+          degree: UndergraduateDegree.medical,
           governorate: 'اللاذقية',
           city: 'جبلة',
           heightCm: 182,
@@ -76,8 +76,8 @@ void main() {
       expect(data['schema'], 'a-id/v1');
       expect(data['id'], 'A-260816-ABC123');
       expect(data['name'], 'Sara Almaziad');
-      expect(data['academicYear'], 'السنة الثالثة');
-      expect(data['degree'], 'بكالوريوس علوم الحاسب');
+      expect(data['academicYear'], 'إجازة جامعية (بكالوريوس)');
+      expect(data['degree'], 'هندسة وتكنولوجيا');
       expect(data['governorate'], 'دمشق');
       expect(data['city'], 'المزة');
       expect(data['country'], 'الجمهورية العربية السورية');
@@ -96,7 +96,7 @@ void main() {
       const other = Applicant(
         firstName: 'A',
         lastName: 'B',
-        academicYear: AcademicYear.fifth,
+        academicYear: AcademicYear.bachelor,
         degree: UndergraduateDegree.other,
         customDegree: 'B.A. Fine Arts',
         governorate: 'طرطوس',

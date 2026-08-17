@@ -55,24 +55,78 @@ class AcuityLine {
     return 2 * (distanceCm * 10) * math.tan(radians / 2);
   }
 
+  /// سماكة ضلع الحرف: خُمس ارتفاعه في شبكة سنيلن 5×5.
+  ///
+  /// هذه هي أصغر تفصيلة في الرمز، وهي ما يحدّ فعليًا قدرة الشاشة على عرضه.
+  double strokeWidthMm(double distanceCm) => optotypeHeightMm(distanceCm) / 5;
+
   /// النسبة العشرية لحدة الإبصار (1.0 تعني 20/20).
   double get decimal => 20 / snellenDenominator;
 
   String get label => '20/$snellenDenominator';
 }
 
-/// أسطر اللوحة الخمسة — من الأكبر إلى الأصغر، تمامًا كلوحة الطبيب.
+/// أسطر اللوحة — تدرّج سنيلن التقليدي الكامل من 20/200 إلى 20/20.
+///
+/// ثمانية أسطر لا خمسة: الفجوات الواسعة (200 ← 100 ← 50) كانت تُقرِّب النتيجة
+/// إلى أقرب سطر بعيد، فيُسجَّل لمن يرى 20/40 نتيجةُ 20/50 أو 20/30. أسطر
+/// 70 و40 و25 تجعل الخطوة بين درجتين متجاورتين قريبة من 0.1 لوغاريتمية،
+/// وهي حدود الخطأ المقبول سريريًا.
 const List<AcuityLine> kAcuityLines = [
   AcuityLine(acuity: VisualAcuity.twentyTwoHundred, snellenDenominator: 200),
   AcuityLine(acuity: VisualAcuity.twentyHundred, snellenDenominator: 100),
+  AcuityLine(acuity: VisualAcuity.twentySeventy, snellenDenominator: 70),
   AcuityLine(acuity: VisualAcuity.twentyFifty, snellenDenominator: 50),
+  AcuityLine(acuity: VisualAcuity.twentyForty, snellenDenominator: 40),
   AcuityLine(acuity: VisualAcuity.twentyThirty, snellenDenominator: 30),
+  AcuityLine(acuity: VisualAcuity.twentyTwentyFive, snellenDenominator: 25),
   AcuityLine(acuity: VisualAcuity.twentyTwenty, snellenDenominator: 20),
 ];
 
 /// عدد الرموز في كل سطر، وعدد الإجابات الصحيحة اللازمة لاجتيازه.
-const int kOptotypesPerLine = 3;
-const int kCorrectToPass = 2;
+///
+/// أربعة رموز و‏ثلاث إجابات صحيحة — بروتوكول Peek Acuity المُتحقَّق منه
+/// سريريًا. للرمز أربعة اتجاهات، أي أن التخمين الأعمى يصيب بنسبة 25%، فاحتمال
+/// «اجتياز» سطرٍ بالتخمين وحده = 5.1% فقط؛ ولأن فشل السطر يُنهي الفحص فورًا
+/// فإن احتمال الوصول إلى 20/20 بالتخمين يساوي هذه النسبة مرفوعة للقوة ثمانية
+/// — أي صفر عمليًا.
+const int kOptotypesPerLine = 4;
+const int kCorrectToPass = 3;
+
+/// عدد الإجابات الخاطئة التي تُنهي السطر.
+const int kWrongToFail = kOptotypesPerLine - kCorrectToPass + 1;
+
+/// أدنى سماكة ضلع تستطيع الشاشة رسمها: بكسل فيزيائي واحد.
+const double _minStrokeDevicePx = 1.0;
+
+/// الأسطر التي تستطيع هذه الشاشة رسمها فعلًا على هذه المسافة.
+///
+/// دون بكسل فيزيائي واحد لسماكة الضلع يتحوّل الحرف إلى لطخة رمادية، فتقيس
+/// اللوحة حدّة الشاشة لا حدّة العين. تُقتطع الأسطر الأدقّ من ذلك بدلًا من
+/// عرضها ونسبة نتيجتها إلى المفحوص. الأسطر مرتبة من الأكبر إلى الأصغر، لذا
+/// المجموعة القابلة للرسم دائمًا بادئة من القائمة.
+List<AcuityLine> renderableAcuityLines({
+  required double pxPerMm,
+  required double distanceCm,
+  required double devicePixelRatio,
+}) {
+  final lines = [
+    for (final line in kAcuityLines)
+      if (line.strokeWidthMm(distanceCm) * pxPerMm * devicePixelRatio >=
+          _minStrokeDevicePx)
+        line,
+  ];
+  // حتى أسوأ الشاشات تعرض سطر 20/200؛ نُبقيه لئلا تخلو اللوحة تمامًا.
+  return lines.isEmpty ? [kAcuityLines.first] : lines;
+}
+
+/// السطر المقابل لحدة إبصار، أو `null` للقيمة الواقعة تحت اللوحة.
+AcuityLine? acuityLineFor(VisualAcuity acuity) {
+  for (final line in kAcuityLines) {
+    if (line.acuity == acuity) return line;
+  }
+  return null;
+}
 
 /// نتيجة فحص عين واحدة.
 @immutable
@@ -83,6 +137,7 @@ class EyeResult {
     required this.correctAnswers,
     required this.totalAnswers,
     required this.passedLines,
+    required this.linesPresented,
   });
 
   final EyeSide side;
@@ -90,8 +145,19 @@ class EyeResult {
   final int correctAnswers;
   final int totalAnswers;
 
-  /// عدد الأسطر المجتازة من أصل [kAcuityLines].length.
+  /// عدد الأسطر المجتازة من أصل [linesPresented].
   final int passedLines;
+
+  /// عدد أسطر اللوحة المعروضة فعلًا بعد اقتطاع ما تعجز الشاشة عن رسمه.
+  final int linesPresented;
+
+  /// لم يُجتَز أي سطر: الإبصار أضعف من أعلى سطر في اللوحة، ولا يجوز نسبة
+  /// قيمة ذلك السطر إلى المفحوص.
+  bool get belowChart => linesPresented > 0 && passedLines == 0;
+
+  /// اكتملت اللوحة المعروضة دون أن تصل إلى 20/20 لأن الشاشة لا تكفي.
+  bool get cappedByScreen =>
+      linesPresented > 0 && linesPresented < kAcuityLines.length;
 
   double get accuracy => totalAnswers == 0 ? 0 : correctAnswers / totalAnswers;
 }
@@ -121,6 +187,7 @@ class VisionTestReport {
         correctAnswers: 0,
         totalAnswers: 0,
         passedLines: 0,
+        linesPresented: 0,
       ),
       left: EyeResult(
         side: EyeSide.left,
@@ -128,6 +195,7 @@ class VisionTestReport {
         correctAnswers: 0,
         totalAnswers: 0,
         passedLines: 0,
+        linesPresented: 0,
       ),
       distanceCm: distanceCm,
       testedAtUtc: testedAtUtc,
@@ -141,7 +209,8 @@ class VisionTestReport {
 
   /// الوصف الكامل للطريقة، يظهر في الشاشة و PDF.
   String get methodLabel =>
-      'فحص تفاعلي (E المتدحرج) · ${distanceCm.round()} سم';
+      'E المتدحرج · $kCorrectToPass من $kOptotypesPerLine لكل سطر · '
+      '${distanceCm.round()} سم';
 
   /// وصف مختصر يناسب المساحة الضيقة على ظهر البطاقة.
   String get shortMethodLabel => 'فحص تفاعلي · ${distanceCm.round()} سم';
