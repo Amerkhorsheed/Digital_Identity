@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Brand launcher icon: pine disc with gold ring and the A monogram. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Pine background -->
+    <path
+        android:pathData="M4,4 L104,4 L104,104 L4,104 Z"
+        android:fillColor="#17352F" />
+
+    <!-- Gold ring -->
+    <path
+        android:pathData="M54,54 m-38,0 a38,38 0 1,1 76,0 a38,38 0 1,1 -76,0"
+        android:strokeColor="#B9A779"
+        android:strokeWidth="4" />
+
+    <!-- A monogram -->
+    <path
+        android:pathData="M36,72 L54,24 L72,72 Z"
+        android:fillColor="#FAF7EF" />
+    <path
+        android:pathData="M44.5,72 L54,49 L63.5,72 Z"
+        android:fillColor="#17352F" />
+    <path
+        android:pathData="M33,58 L75,58 L75,64 L33,64 Z"
+        android:fillColor="#FAF7EF" />
+</vector>

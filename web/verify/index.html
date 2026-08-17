@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#17352F" />
+    <meta name="robots" content="noindex" />
+    <title>الهوية الرقمية — عرض البطاقة</title>
+
+    <style>
+      @font-face {
+        font-family: 'Almarai';
+        src: url('./assets/Almarai-Regular.ttf') format('truetype');
+        font-weight: 400;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Almarai';
+        src: url('./assets/Almarai-Bold.ttf') format('truetype');
+        font-weight: 700 800;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'SpaceMono';
+        src: url('./assets/SpaceMono-Bold.ttf') format('truetype');
+        font-weight: 700;
+        font-display: swap;
+      }
+
+      :root {
+        --pine: #17352f;
+        --pine-deep: #0e231f;
+        --gold: #b9a779;
+        --gold-deep: #8a7443;
+        --gold-mist: #f6f1e4;
+        --ivory: #faf7ef;
+        --ink: #16211e;
+        --ink-muted: #5c6b66;
+        --outline: #eae4d5;
+        --error: #b3261e;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        background: var(--ivory);
+        color: var(--ink);
+        font-family: 'Almarai', 'Segoe UI', Tahoma, sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      header {
+        background: linear-gradient(135deg, #1e453c, var(--pine) 55%, var(--pine-deep));
+        color: #fff;
+        padding: calc(env(safe-area-inset-top) + 18px) 20px 18px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 8px 24px rgba(14, 35, 31, 0.28);
+      }
+      header img { width: 44px; height: 44px; border-radius: 50%; background: #fff; padding: 5px; }
+      header h1 { font-size: 17px; margin: 0; font-weight: 800; }
+      header p { margin: 2px 0 0; font-size: 11px; color: #d9c79b; }
+
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 24px 20px calc(env(safe-area-inset-bottom) + 40px);
+      }
+
+      .state { text-align: center; padding: 48px 12px; }
+      .state h2 { font-size: 20px; margin: 16px 0 6px; color: var(--pine); }
+      .state p { color: var(--ink-muted); line-height: 1.8; margin: 0; font-size: 14px; }
+      .state.error h2 { color: var(--error); }
+
+      .spinner {
+        width: 38px; height: 38px; margin: 0 auto;
+        border: 3px solid var(--gold-mist);
+        border-top-color: var(--gold);
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: var(--gold-mist);
+        border: 1px solid rgba(185, 167, 121, 0.5);
+        color: var(--gold-deep);
+        border-radius: 999px;
+        padding: 9px 18px;
+        font-family: 'SpaceMono', monospace;
+        font-weight: 700;
+        letter-spacing: 1.2px;
+        font-size: 14px;
+      }
+
+      h2.title { text-align: center; color: var(--pine); font-size: 24px; margin: 14px 0 10px; }
+      p.lede { text-align: center; color: var(--ink-muted); line-height: 1.8; font-size: 14px; margin: 0 0 22px; }
+
+      #cardWrap { text-align: center; }
+      canvas#sheet {
+        width: 100%;
+        max-width: 592px;
+        height: auto;
+        border-radius: 18px;
+        box-shadow: 0 14px 40px rgba(23, 53, 47, 0.14);
+        background: var(--ivory);
+      }
+
+      .actions { display: grid; gap: 12px; margin-top: 26px; }
+      @media (min-width: 620px) { .actions { grid-template-columns: 1fr 1fr; } }
+
+      button.download {
+        display: flex; align-items: center; gap: 14px;
+        width: 100%;
+        padding: 16px 18px;
+        border: 0;
+        border-radius: 18px;
+        background: linear-gradient(135deg, #1e453c, var(--pine));
+        color: #fff;
+        font-family: inherit;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        text-align: right;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      button.download:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(23, 53, 47, 0.24); }
+      button.download:disabled { opacity: 0.6; cursor: progress; transform: none; }
+      button.download .icon {
+        width: 42px; height: 42px; flex: none;
+        border-radius: 50%;
+        background: rgba(185, 167, 121, 0.18);
+        border: 1px solid rgba(185, 167, 121, 0.5);
+        display: grid; place-items: center;
+        font-size: 18px;
+      }
+      button.download small { display: block; font-weight: 400; font-size: 11.5px; color: #d9c79b; margin-top: 2px; }
+
+      .note {
+        margin-top: 22px;
+        padding: 14px 16px;
+        background: var(--gold-mist);
+        border: 1px solid rgba(185, 167, 121, 0.4);
+        border-radius: 14px;
+        font-size: 12.5px;
+        line-height: 1.8;
+        color: var(--gold-deep);
+      }
+
+      dl.facts {
+        margin: 24px 0 0;
+        border: 1px solid var(--outline);
+        border-radius: 18px;
+        background: #fff;
+        overflow: hidden;
+      }
+      dl.facts div {
+        display: flex; justify-content: space-between; gap: 16px;
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--outline);
+        font-size: 13.5px;
+      }
+      dl.facts div:last-child { border-bottom: 0; }
+      dl.facts dt { color: var(--ink-muted); margin: 0; }
+      dl.facts dd { margin: 0; font-weight: 700; }
+
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <img src="./assets/logo.jpg" alt="" />
+      <div>
+        <h1>الهوية الرقمية</h1>
+        <p>عرض البطاقة والتحقق منها</p>
+      </div>
+    </header>
+
+    <main>
+      <section id="loading" class="state">
+        <div class="spinner"></div>
+        <h2>جارٍ فتح البطاقة…</h2>
+        <p>يُفكّ الرمز داخل متصفحك، ولا تُرسل أي بيانات إلى أي خادم.</p>
+      </section>
+
+      <section id="error" class="state error" hidden>
+        <h2 id="errorTitle">تعذّر فتح البطاقة</h2>
+        <p id="errorBody"></p>
+      </section>
+
+      <section id="card" hidden>
+        <div style="text-align: center">
+          <span class="badge" id="personalId"></span>
+        </div>
+        <h2 class="title" id="fullName"></h2>
+        <p class="lede">هذه بطاقة الهوية الرقمية كما صدرت. نزّلها كصورة PNG عالية الدقة أو مستند PDF رسمي.</p>
+
+        <div id="cardWrap"><canvas id="sheet"></canvas></div>
+
+        <div class="actions">
+          <button class="download" id="pngButton" type="button">
+            <span class="icon">🖼️</span>
+            <span>تنزيل صورة PNG<small>دقة ثلاثية · للحفظ في الصور</small></span>
+          </button>
+          <button class="download" id="pdfButton" type="button">
+            <span class="icon">📄</span>
+            <span>تنزيل مستند PDF<small>صفحة A4 جاهزة للطباعة</small></span>
+          </button>
+        </div>
+
+        <dl class="facts" id="facts"></dl>
+
+        <p class="note">
+          فُكّ رمز البطاقة داخل متصفحك بالكامل — لم تُرسل أي بيانات إلى أي خادم.
+          الصورة الشخصية لا تُنقل داخل الرمز، لذا تظهر البطاقة هنا بإطار الصورة فارغًا.
+        </p>
+      </section>
+    </main>
+
+    <script type="module">
+      import { decodeCard, CardError, formatWeight } from './payload.js';
+      import {
+        loadAssets, drawSheet, canvasToPngBlob, canvasToPdfBlob,
+      } from './card.js';
+
+      const $ = (id) => document.getElementById(id);
+
+      function show(section) {
+        for (const id of ['loading', 'error', 'card']) {
+          $(id).hidden = id !== section;
+        }
+      }
+
+      function fail(message) {
+        $('errorBody').textContent = message;
+        show('error');
+      }
+
+      function download(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        // Give the browser a moment to start the save before revoking.
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+      }
+
+      async function withBusy(button, label, run) {
+        const original = button.innerHTML;
+        button.disabled = true;
+        button.querySelector('span:last-child').innerHTML =
+          `${label}<small>جارٍ التجهيز…</small>`;
+        try {
+          await run();
+        } catch (error) {
+          alert('تعذّر تجهيز الملف. حاول مرة أخرى.');
+          console.error(error);
+        } finally {
+          button.innerHTML = original;
+          button.disabled = false;
+        }
+      }
+
+      async function main() {
+        try {
+          const card = await decodeCard(location.hash);
+          card.link = location.href;
+
+          await loadAssets();
+
+          $('personalId').textContent = card.personalId;
+          $('fullName').textContent = card.fullName;
+
+          const facts = [
+            ['المرحلة الدراسية', card.academicYear],
+            ['الدرجة الجامعية', card.degree],
+            ['المحافظة والمدينة', card.placeLabel],
+            ['فصيلة الدم', card.bloodType],
+            ['الطول', `${card.heightCm} سم`],
+            ['الوزن', formatWeight(card.weightKg)],
+            ['العين اليمنى', card.rightEye],
+            ['العين اليسرى', card.leftEye],
+            ['تصحيح الإبصار', card.correction],
+            ['مصدر قياس الإبصار', card.visionSource],
+            ['تاريخ الإصدار', card.issuedAtLabel],
+          ];
+          $('facts').innerHTML = facts
+            .map(
+              ([term, value]) =>
+                `<div><dt>${term}</dt><dd>${escapeHtml(String(value))}</dd></div>`,
+            )
+            .join('');
+
+          const canvas = $('sheet');
+          drawSheet(canvas, card, 3);
+          show('card');
+
+          const name = `A-ID-${card.personalId.replace(/[^A-Za-z0-9-]/g, '')}`;
+
+          $('pngButton').addEventListener('click', () =>
+            withBusy($('pngButton'), 'تنزيل صورة PNG', async () => {
+              download(await canvasToPngBlob(canvas), `${name}.png`);
+            }),
+          );
+
+          $('pdfButton').addEventListener('click', () =>
+            withBusy($('pdfButton'), 'تنزيل مستند PDF', async () => {
+              download(
+                await canvasToPdfBlob(canvas, name),
+                `${name}.pdf`,
+              );
+            }),
+          );
+        } catch (error) {
+          console.error(error);
+          fail(
+            error instanceof CardError
+              ? error.message
+              : 'حدث خطأ غير متوقع أثناء قراءة الرمز.',
+          );
+        }
+      }
+
+      function escapeHtml(text) {
+        return text.replace(
+          /[&<>"']/g,
+          (c) =>
+            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]),
+        );
+      }
+
+      main();
+      addEventListener('hashchange', () => location.reload());
+    </script>
+  </body>
+</html>
