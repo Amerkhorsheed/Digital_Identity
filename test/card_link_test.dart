@@ -14,18 +14,16 @@ final _report = VisionTestReport.decoded(
 );
 
 final _applicant = Applicant(
-  firstName: 'سارة',
-  lastName: 'الحلبي',
+  fullName: 'سارة محمد الحلبي',
+  birthYear: 2001,
   academicYear: AcademicYear.bachelor,
-  degree: UndergraduateDegree.engineering,
   governorate: 'ريف دمشق',
-  city: 'دوما',
   heightCm: 165,
   weightKg: 58.5,
   bloodType: BloodType.oPositive,
   rightEyeAcuity: VisualAcuity.twentyTwenty,
   leftEyeAcuity: VisualAcuity.twentyThirty,
-  visionCorrection: VisionCorrection.glasses,
+  hasBiometric: true,
   visionTest: _report,
   photoPath: '/tmp/portrait.jpg',
 );
@@ -48,8 +46,6 @@ void main() {
   });
 
   test('falls back to the app scheme until a verifier page is configured', () {
-    // A phone camera cannot act on this — which is exactly why the hosted
-    // https page exists. The fallback only keeps the in-app scanner working.
     expect(kHasHostedVerifier, isFalse);
     expect(_encode(), startsWith('adigitalid://card?v=2&d='));
   });
@@ -60,8 +56,6 @@ void main() {
       personalId: _id,
       issuedAtUtc: _issuedAt,
     );
-    // The host is not part of the contract: the page can be rehosted, and old
-    // cards keep working, because only the fragment carries the data.
     for (final host in [
       'https://example.com/id',
       'https://someone.github.io/a-id/',
@@ -70,7 +64,7 @@ void main() {
       final card = CardLink.decode('$host#$payload');
       expect(card, isNotNull, reason: host);
       expect(card!.personalId, _id);
-      expect(card.applicant.city, 'دوما');
+      expect(card.applicant.governorate, 'ريف دمشق');
     }
   });
 
@@ -81,15 +75,12 @@ void main() {
       issuedAtUtc: _issuedAt,
     );
     final uri = Uri.parse('https://example.com/id#$payload');
-    // Fragments are never transmitted in an HTTP request.
     expect(uri.path, '/id');
     expect(uri.query, isEmpty);
     expect(uri.fragment, payload);
   });
 
   test('stays small enough for a comfortably scannable symbol', () {
-    // A dense QR is a slow, failure-prone QR; the raw JSON payload was ~450
-    // characters. Anything under 300 scans instantly at card size.
     expect(_encode().length, lessThan(300));
   });
 
@@ -98,58 +89,33 @@ void main() {
 
     expect(card.personalId, _id);
     expect(card.issuedAt, _issuedAt);
-    expect(card.applicant.fullName, 'سارة الحلبي');
+    expect(card.applicant.fullName, 'سارة محمد الحلبي');
+    expect(card.applicant.birthYear, 2001);
     expect(card.applicant.academicYear, AcademicYear.bachelor);
-    expect(card.applicant.degreeLabel, 'هندسة وتكنولوجيا');
     expect(card.applicant.governorate, 'ريف دمشق');
-    expect(card.applicant.city, 'دوما');
-    expect(card.applicant.placeLabel, 'دوما، ريف دمشق');
+    expect(card.applicant.placeLabel, 'ريف دمشق');
     expect(card.applicant.heightCm, 165);
     expect(card.applicant.weightKg, 58.5);
     expect(card.applicant.bloodType, BloodType.oPositive);
     expect(card.applicant.rightEyeAcuity, VisualAcuity.twentyTwenty);
     expect(card.applicant.leftEyeAcuity, VisualAcuity.twentyThirty);
-    expect(card.applicant.visionCorrection, VisionCorrection.glasses);
+    expect(card.applicant.hasBiometric, isTrue);
     expect(card.applicant.visionSourceShortLabel, 'فحص تفاعلي · 40 سم');
-  });
-
-  test('carries a custom major through verbatim', () {
-    final custom = Applicant(
-      firstName: 'عمر',
-      lastName: 'الحداد',
-      academicYear: AcademicYear.bachelor,
-      degree: UndergraduateDegree.other,
-      customDegree: 'فنون جميلة',
-      governorate: 'حلب',
-      city: 'منبج',
-      heightCm: 180,
-      weightKg: 75,
-      bloodType: BloodType.aNegative,
-      rightEyeAcuity: VisualAcuity.twentyForty,
-      leftEyeAcuity: VisualAcuity.twentyFifty,
-      visionCorrection: VisionCorrection.none,
-    );
-
-    final card = CardLink.decode(_encode(custom))!;
-    expect(card.applicant.degree, UndergraduateDegree.other);
-    expect(card.applicant.degreeLabel, 'فنون جميلة');
   });
 
   test('marks a manually entered acuity as such', () {
     final manual = _applicant.copyWith();
     final withoutTest = Applicant(
-      firstName: manual.firstName,
-      lastName: manual.lastName,
+      fullName: manual.fullName,
+      birthYear: manual.birthYear,
       academicYear: manual.academicYear,
-      degree: manual.degree,
       governorate: manual.governorate,
-      city: manual.city,
       heightCm: manual.heightCm,
       weightKg: manual.weightKg,
       bloodType: manual.bloodType,
       rightEyeAcuity: manual.rightEyeAcuity,
       leftEyeAcuity: manual.leftEyeAcuity,
-      visionCorrection: manual.visionCorrection,
+      hasBiometric: manual.hasBiometric,
     );
 
     final card = CardLink.decode(_encode(withoutTest))!;
@@ -167,7 +133,6 @@ void main() {
 
     test('a corrupted payload', () {
       final link = _encode();
-      // Flip a character in the middle of the data.
       final index = link.length ~/ 2;
       final corrupted = link.replaceRange(
         index,

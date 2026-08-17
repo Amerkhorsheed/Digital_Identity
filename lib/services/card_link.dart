@@ -1,12 +1,12 @@
 import 'dart:convert';
-import 'dart:io' show gzip;
+import 'dart:io';
 import 'dart:typed_data';
 
 import '../config/verify_endpoint.dart';
 import '../models/applicant.dart';
 import '../models/vision_test.dart';
 
-/// A card rebuilt from a scanned QR code.
+/// A decoded card retrieved from a QR scan or a deep link.
 class ScannedCard {
   const ScannedCard({
     required this.applicant,
@@ -19,46 +19,30 @@ class ScannedCard {
   final DateTime issuedAt;
 }
 
-/// The link encoded inside every identity card's QR code.
+/// Serializes and deserializes the self-contained payload stored in a card QR
+/// code.
 ///
-/// **Why a link and not the card file itself**: a QR code tops out at roughly
-/// 2.9 KB, while the card is a ~600 KB PNG or a ~200 KB PDF. No QR symbol can
-/// ever carry the file. So the code carries a compact, self-contained copy of
-/// the identity data — every field the card prints — and whoever scans it
-/// rebuilds the card and exports it as PNG or PDF. The bytes travel; the file
-/// is regenerated at the other end.
+/// Format:
 ///
-/// **Why an https link**: phone cameras are built around https. They open one
-/// immediately, and hand it to the app itself when it is installed (Universal
-/// Links / App Links). A private scheme like `adigitalid://` is not reliably
-/// surfaced by the camera and does nothing at all on a phone without the app —
-/// which is every phone but the issuer's. See [kVerifierBaseUrl].
-///
-/// Emitted form (once a verifier is configured):
-///
-/// ```text
-/// https://your.host/id#<base64url>
+/// ```
+/// [version: 1 byte][flags: 1 byte][crc16: 2 bytes big-endian][body...]
 /// ```
 ///
-/// The payload lives in the URL *fragment*, which HTTP never sends to the
-/// server, so the identity data never leaves the scanner's device.
-///
-/// Payload framing: `[version][flags][crc16-hi][crc16-lo][body]`, where `body`
-/// is a compact JSON map with single-letter keys, gzipped when that actually
-/// saves space. The CRC stops a misread symbol from being accepted as a card.
+/// - `version`: `2` (the binary envelope format).
+/// - `flags`: bit 0 = payload is gzip compressed.
+/// - `crc16`: CRC-16/CCITT-FALSE of `body`, rejecting truncated or corrupt scans.
+/// - `body`: UTF-8 JSON map encoded as base64url without padding.
 abstract final class CardLink {
+  /// The scheme used when no hosted verifier page is configured.
   static const String scheme = 'adigitalid';
   static const String host = 'card';
 
-  /// Payload format version. Readers reject anything newer than they know.
+  /// Binary format version. Incremented only when the frame layout changes.
   static const int version = 2;
 
-  static const int _flagGzip = 0x01;
+  static const int _flagGzip = 1 << 0;
 
-  /// Builds the string that is drawn into the card's QR code.
-  ///
-  /// Falls back to the app-only scheme while no verifier page is configured,
-  /// so nothing breaks before the page is hosted.
+  /// Builds the full URL that the QR code will encode.
   static String encode({
     required Applicant applicant,
     required String personalId,
@@ -87,17 +71,16 @@ abstract final class CardLink {
     final map = <String, Object?>{
       'i': personalId,
       'n': applicant.fullName,
+      'a': applicant.birthYear,
       'y': applicant.academicYear.index,
-      'd': applicant.degreeLabel,
       'g': applicant.governorate,
-      'c': applicant.city,
       'h': applicant.heightCm,
       // Tenths of a kilogram keeps the payload integer-only.
       'w': (applicant.weightKg * 10).round(),
       'b': applicant.bloodType.index,
       'r': applicant.rightEyeAcuity.index,
       'l': applicant.leftEyeAcuity.index,
-      'x': applicant.visionCorrection.index,
+      'p': applicant.hasBiometric ? 1 : 0,
       't': issuedAtUtc.toUtc().millisecondsSinceEpoch ~/ 1000,
       if (applicant.visionTest != null)
         'm': applicant.visionTest!.distanceCm.round(),
@@ -121,10 +104,6 @@ abstract final class CardLink {
 
   /// Rebuilds a card from a scanned string, or returns `null` when the string
   /// is not one of ours, is corrupt, or uses a newer format.
-  ///
-  /// Accepts both shapes a card can carry: an https verifier link with the
-  /// payload in its fragment (any host — only the fragment matters, so the
-  /// page can be rehosted freely), and the app-only `adigitalid://` scheme.
   static ScannedCard? decode(String raw) {
     final data = _payloadOf(raw);
     if (data == null || data.isEmpty) return null;
@@ -170,41 +149,32 @@ abstract final class CardLink {
 
   static ScannedCard? _fromMap(Map<String, dynamic> map) {
     final personalId = map['i'] as String?;
-    final name = (map['n'] as String?)?.trim();
-    if (personalId == null || name == null || name.isEmpty) return null;
+    final fullName = (map['n'] as String?)?.trim();
+    if (personalId == null || fullName == null || fullName.isEmpty) return null;
 
-    final parts = name.split(RegExp(r'\s+'));
-    final firstName = parts.first;
-    final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
-
-    final degreeLabel = map['d'] as String? ?? '';
-    final degree = UndergraduateDegree.fromLabel(degreeLabel);
+    final birthYear = map['a'] as int? ?? 2001;
     final issuedAt = DateTime.fromMillisecondsSinceEpoch(
-      (map['t'] as int) * 1000,
+      (map['t'] as int? ?? 0) * 1000,
       isUtc: true,
     );
 
     final right = VisualAcuity.values[_index(map['r'], VisualAcuity.values)];
     final left = VisualAcuity.values[_index(map['l'], VisualAcuity.values)];
     final distance = map['m'] as int?;
+    final hasBiometric = (map['p'] as int? ?? 1) == 1;
 
     final applicant = Applicant(
-      firstName: firstName,
-      lastName: lastName,
+      fullName: fullName,
+      birthYear: birthYear,
       academicYear:
           AcademicYear.values[_index(map['y'], AcademicYear.values)],
-      degree: degree ?? UndergraduateDegree.other,
-      // An unrecognised label is a custom major, carried through verbatim.
-      customDegree: degree == null ? degreeLabel : null,
       governorate: map['g'] as String? ?? '',
-      city: map['c'] as String? ?? '',
       heightCm: map['h'] as int? ?? 0,
       weightKg: (map['w'] as int? ?? 0) / 10,
       bloodType: BloodType.values[_index(map['b'], BloodType.values)],
       rightEyeAcuity: right,
       leftEyeAcuity: left,
-      visionCorrection:
-          VisionCorrection.values[_index(map['x'], VisionCorrection.values)],
+      hasBiometric: hasBiometric,
       visionTest: distance == null
           ? null
           : VisionTestReport.decoded(

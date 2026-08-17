@@ -1,0 +1,23 @@
+{
+    "name": "إدارة القوى البشرية — الهوية الرقمية",
+    "short_name": "الهوية الرقمية",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#17352F",
+    "theme_color": "#17352F",
+    "description": "منظومة الهوية الرقمية وتسجيل المنتسبين وإصدار البطاقات الذكية.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "assets/A.jpg",
+            "sizes": "192x192",
+            "type": "image/jpeg"
+        },
+        {
+            "src": "assets/A.jpg",
+            "sizes": "512x512",
+            "type": "image/jpeg"
+        }
+    ]
+}

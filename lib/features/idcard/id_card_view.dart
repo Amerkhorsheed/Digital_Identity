@@ -231,7 +231,7 @@ class IdCardView extends StatelessWidget {
                           ),
                           SizedBox(height: cardWidth * 0.012),
                           Text(
-                            '${applicant.academicYear.label}  ·  ${applicant.degreeLabel}',
+                            '${applicant.academicYear.label}  ·  مواليد ${applicant.birthYear}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -455,11 +455,11 @@ class IdCardBack extends StatelessWidget {
                         cardWidth: cardWidth,
                         items: [
                           ('فصيلة الدم', applicant.bloodType.label),
+                          ('سنة الميلاد', '${applicant.birthYear}'),
                           ('الطول', '${applicant.heightCm} سم'),
                           ('الوزن', _formatWeight(applicant.weightKg)),
                           ('العين اليمنى', applicant.rightEyeAcuity.label),
                           ('العين اليسرى', applicant.leftEyeAcuity.label),
-                          ('التصحيح', applicant.visionCorrection.label),
                         ],
                       ),
                       const Spacer(),

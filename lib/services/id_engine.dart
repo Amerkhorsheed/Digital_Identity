@@ -25,11 +25,11 @@ abstract final class IdEngine {
     DateTime issuedAtUtc,
   ) async {
     final salt = List<int>.generate(16, (_) => _random.nextInt(256));
-    final canonical = '${applicant.fullName}|${applicant.degreeLabel}'
-        '|${applicant.governorate}|${applicant.city}|${applicant.bloodType.label}'
+    final canonical = '${applicant.fullName}|${applicant.birthYear}'
+        '|${applicant.academicYear.label}|${applicant.governorate}|${applicant.bloodType.label}'
         '|${applicant.heightCm}|${applicant.weightKg}'
         '|${applicant.rightEyeAcuity.label}|${applicant.leftEyeAcuity.label}'
-        '|${applicant.academicYear.label}';
+        '|${applicant.hasBiometric}';
     final payload = utf8.encode('$canonical|${issuedAtUtc.toIso8601String()}|$salt');
     final hash = await Sha256().hash(payload);
 
@@ -59,17 +59,16 @@ abstract final class IdEngine {
       'id': personalId,
       'issuedAt': issuedAtUtc.toUtc().toIso8601String(),
       'name': applicant.fullName,
+      'birthYear': applicant.birthYear,
       'academicYear': applicant.academicYear.label,
-      'degree': applicant.degreeLabel,
       'governorate': applicant.governorate,
-      'city': applicant.city,
       'country': 'الجمهورية العربية السورية',
       'heightCm': applicant.heightCm,
       'weightKg': applicant.weightKg,
       'bloodType': applicant.bloodType.label,
       'rightEye': applicant.rightEyeAcuity.label,
       'leftEye': applicant.leftEyeAcuity.label,
-      'visionCorrection': applicant.visionCorrection.label,
+      'biometric': applicant.hasBiometric ? 'موثقة' : 'غير مسجلة',
       'visionSource': applicant.visionSourceLabel,
       'issuedBy': 'الهوية الرقمية — أ',
     };

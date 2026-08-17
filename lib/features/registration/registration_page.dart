@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/brand_colors.dart';
-import '../../data/syria_places.dart';
 import '../../models/applicant.dart';
 import '../../models/vision_test.dart';
 import '../../services/id_engine.dart';
 import '../../services/id_record_store.dart';
 import '../../shared/widgets/adaptive_layout.dart';
-import '../../shared/widgets/animations.dart';
 import '../../shared/widgets/brand_widgets.dart';
 import '../../shared/widgets/ornament_background.dart';
 import '../idcard/id_result_page.dart';
@@ -15,37 +13,34 @@ import '../verify/scan_card_page.dart';
 import 'steps/health_step.dart';
 import 'steps/identity_step.dart';
 import 'steps/photo_step.dart';
+import 'steps/turn_step.dart';
 import 'widgets/flow_header.dart';
 
 /// Mutable draft of the applicant being registered. Each step edits the draft
 /// in place and notifies the page so validation can re-run live.
 class ApplicantDraft {
-  String firstName = '';
-  String lastName = '';
+  String turnNumber = 'A-001';
+  String fullName = '';
+  int? birthYear;
   AcademicYear? academicYear;
-  UndergraduateDegree? degree;
-  String? customDegree;
   String? governorate;
-  String? city;
-  String? customCity;
-  int? heightCm;
-  double? weightKg;
+  int? heightCm = 172;
+  double? weightKg = 68.0;
   BloodType? bloodType;
   VisualAcuity? rightEyeAcuity;
   VisualAcuity? leftEyeAcuity;
-  VisionCorrection? visionCorrection;
+  bool hasBiometric = false;
   VisionTestReport? visionTest;
   String? photoPath;
 
   bool get hasPhoto => photoPath != null && photoPath!.isNotEmpty;
-
-  /// The city as it will be printed on the card.
-  String get resolvedCity =>
-      city == kOtherPlace ? (customCity?.trim() ?? '') : (city ?? '');
 }
 
-/// The three-step registration journey. The header (brand + stepper) stays
-/// pinned to the top of the screen while the content slides between steps.
+/// The four-step registration journey:
+/// 1. Reception & Turn reservation (الاستقبال / قطع الدور)
+/// 2. Identity details (البيانات)
+/// 3. Health measurements & Eye test (الصحة)
+/// 4. Portrait & Biometric fingerprint (البصمة)
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({super.key, required this.store});
 
@@ -56,8 +51,8 @@ class RegistrationPage extends StatefulWidget {
 }
 
 class _RegistrationPageState extends State<RegistrationPage> {
-  static const int _stepCount = 3;
-  static const List<String> _stepTitles = ['الهوية', 'الصحة', 'الصورة'];
+  static const int _stepCount = 4;
+  static const List<String> _stepTitles = ['الاستقبال', 'البيانات', 'الصحة', 'البصمة'];
 
   PageController _pageController = PageController();
   ApplicantDraft _draft = ApplicantDraft();
@@ -65,6 +60,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   /// Bumped on every fresh registration so the step widgets — and the text
   /// controllers they own — are rebuilt from scratch rather than reused.
   int _session = 0;
+  int _turnSequence = 1;
 
   int _step = 0;
   bool _generating = false;
@@ -80,12 +76,21 @@ class _RegistrationPageState extends State<RegistrationPage> {
     if (mounted) setState(() {});
   }
 
-  /// Clears the whole journey and returns to step one.
+  void _resetTurn() {
+    _turnSequence = _turnSequence >= 999 ? 1 : _turnSequence + 1;
+    setState(() {
+      _draft.turnNumber = 'A-${_turnSequence.toString().padLeft(3, '0')}';
+    });
+  }
+
+  /// Clears the whole journey, advances to the next turn number, and returns to step zero.
   void _startNewRegistration() {
     _pageController.dispose();
+    _turnSequence = _turnSequence >= 999 ? 1 : _turnSequence + 1;
+    final nextTurn = 'A-${_turnSequence.toString().padLeft(3, '0')}';
     setState(() {
       _pageController = PageController();
-      _draft = ApplicantDraft();
+      _draft = ApplicantDraft()..turnNumber = nextTurn;
       _session++;
       _step = 0;
       _showErrors = false;
@@ -105,8 +110,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
         if (!didPop && _step > 0) _goBack();
       },
       child: Scaffold(
-        // The action bar handles its own inset, so the body is not resized
-        // out from under the form when the keyboard appears.
         resizeToAvoidBottomInset: true,
         body: OrnamentBackground(
           child: Column(
@@ -115,6 +118,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 currentStep: _step,
                 totalSteps: _stepCount,
                 stepTitles: _stepTitles,
+                turnNumber: _draft.turnNumber,
+                onResetTurn: _resetTurn,
                 onScan: () =>
                     ScanCardPage.open(context, store: widget.store),
               ),
@@ -128,36 +133,42 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     _showErrors = false;
                   }),
                   children: [
-                    IdentityStep(
+                    TurnStep(
                       draft: _draft,
-                      errors: _visibleErrors(0),
                       onChanged: _refresh,
+                      onNext: _goForward,
                     ),
-                    HealthStep(
+                    IdentityStep(
                       draft: _draft,
                       errors: _visibleErrors(1),
                       onChanged: _refresh,
                     ),
-                    PhotoStep(
+                    HealthStep(
                       draft: _draft,
                       errors: _visibleErrors(2),
+                      onChanged: _refresh,
+                    ),
+                    PhotoStep(
+                      draft: _draft,
+                      errors: _visibleErrors(3),
                       onChanged: _refresh,
                     ),
                   ],
                 ),
               ),
-              _ActionBar(
-                step: _step,
-                stepCount: _stepCount,
-                generating: _generating,
-                canGoBack: canGoBack,
-                canContinue: canContinue,
-                blockedReason: _showErrors || errors.isEmpty
-                    ? null
-                    : 'أكمل الحقول المطلوبة للمتابعة',
-                onBack: _goBack,
-                onContinue: _step == _stepCount - 1 ? _issueCard : _goForward,
-              ),
+              if (_step > 0)
+                _ActionBar(
+                  step: _step,
+                  stepCount: _stepCount,
+                  generating: _generating,
+                  canGoBack: canGoBack,
+                  canContinue: canContinue,
+                  blockedReason: _showErrors || errors.isEmpty
+                      ? null
+                      : 'أكمل الحقول المطلوبة للمتابعة',
+                  onBack: _goBack,
+                  onContinue: _step == _stepCount - 1 ? _issueCard : _goForward,
+                ),
             ],
           ),
         ),
@@ -165,8 +176,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
     );
   }
 
-  /// Errors are computed live but only *shown* after the user tries to move
-  /// on, so a pristine form never greets the user in red.
   Map<String, String> _visibleErrors(int step) =>
       _showErrors && step == _step ? _computeErrors(step) : const {};
 
@@ -175,33 +184,29 @@ class _RegistrationPageState extends State<RegistrationPage> {
     final draft = _draft;
     switch (step) {
       case 0:
-        if (draft.firstName.trim().length < 2) {
-          errors['firstName'] = 'حرفان على الأقل';
+        // Reception / Turn stage is always valid
+        break;
+      case 1:
+        final nameParts = draft.fullName
+            .trim()
+            .split(RegExp(r'\s+'))
+            .where((s) => s.isNotEmpty)
+            .toList();
+        if (nameParts.length < 3) {
+          errors['fullName'] = 'يرجى إدخال الاسم الثلاثي كاملاً (٣ مقاطع)';
         }
-        if (draft.lastName.trim().length < 2) {
-          errors['lastName'] = 'حرفان على الأقل';
+        if (draft.birthYear == null ||
+            draft.birthYear! < 1920 ||
+            draft.birthYear! > DateTime.now().year) {
+          errors['birthYear'] = 'سنة الميلاد مطلوبة';
         }
         if (draft.academicYear == null) {
           errors['academicYear'] = 'مطلوب';
         }
-        if (draft.degree == null) {
-          errors['degree'] = 'مطلوب';
-        }
-        if (draft.degree == UndergraduateDegree.other &&
-            (draft.customDegree == null ||
-                draft.customDegree!.trim().isEmpty)) {
-          errors['customDegree'] = 'مطلوب';
-        }
-        if (draft.governorate == null) {
+        if (draft.governorate == null || draft.governorate!.isEmpty) {
           errors['governorate'] = 'مطلوب';
         }
-        if (draft.city == null || draft.city!.isEmpty) {
-          errors['city'] = 'مطلوب';
-        }
-        if (draft.city == kOtherPlace && draft.resolvedCity.isEmpty) {
-          errors['customCity'] = 'مطلوب';
-        }
-      case 1:
+      case 2:
         if (draft.heightCm == null ||
             draft.heightCm! < 100 ||
             draft.heightCm! > 250) {
@@ -215,15 +220,15 @@ class _RegistrationPageState extends State<RegistrationPage> {
         if (draft.bloodType == null) {
           errors['bloodType'] = 'مطلوب';
         }
-        if (draft.visionCorrection == null) {
-          errors['correction'] = 'مطلوب';
-        }
         if (draft.rightEyeAcuity == null || draft.leftEyeAcuity == null) {
           errors['vision'] = 'أجرِ فحص النظر أو أدخل نتيجة تقريرك الطبي';
         }
-      case 2:
+      case 3:
         if (!draft.hasPhoto) {
           errors['photo'] = 'الصورة مطلوبة لإصدار بطاقة الهوية';
+        }
+        if (!draft.hasBiometric) {
+          errors['biometric'] = 'يرجى مسح وتأكيد بصمة الإصبع البيومترية';
         }
     }
     return errors;
@@ -260,21 +265,17 @@ class _RegistrationPageState extends State<RegistrationPage> {
     setState(() => _generating = true);
     final draft = _draft;
     final applicant = Applicant(
-      firstName: draft.firstName.trim(),
-      lastName: draft.lastName.trim(),
+      turnNumber: draft.turnNumber,
+      fullName: draft.fullName.trim(),
+      birthYear: draft.birthYear!,
       academicYear: draft.academicYear!,
-      degree: draft.degree!,
-      customDegree: draft.degree == UndergraduateDegree.other
-          ? draft.customDegree?.trim()
-          : null,
       governorate: draft.governorate!,
-      city: draft.resolvedCity,
       heightCm: draft.heightCm!,
       weightKg: draft.weightKg!,
       bloodType: draft.bloodType!,
       rightEyeAcuity: draft.rightEyeAcuity!,
       leftEyeAcuity: draft.leftEyeAcuity!,
-      visionCorrection: draft.visionCorrection!,
+      hasBiometric: draft.hasBiometric,
       visionTest: draft.visionTest,
       photoPath: draft.photoPath,
     );
@@ -367,51 +368,42 @@ class _ActionBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: ResponsiveShell(
-          // A primary button stretched across a TV reads as a banner, not a
-          // button — cap it and keep it centred.
-          maxWidth: band.isCompact ? double.infinity : 720,
+          maxWidth: band.isCompact ? double.infinity : 680,
           padding: EdgeInsets.symmetric(
             horizontal: band.gutter,
-            vertical: 12,
+            vertical: 12 * band.scale,
           ),
           child: Row(
             children: [
-              if (canGoBack) ...[
-                IconButton.filledTonal(
+              if (canGoBack)
+                OutlinedButton.icon(
                   onPressed: onBack,
-                  tooltip: 'رجوع',
-                  style: IconButton.styleFrom(
-                    minimumSize: Size.square(52 * band.scale),
-                    backgroundColor: BrandColors.ivoryDeep,
+                  style: OutlinedButton.styleFrom(
                     foregroundColor: BrandColors.pine,
+                    side: const BorderSide(color: BrandColors.outlineSoft),
+                    minimumSize: Size(96 * band.scale, 48 * band.scale),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(BrandRadii.pill),
+                    ),
                   ),
-                  icon: const Icon(Icons.arrow_forward_rounded),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                  label: const Text('السابق'),
                 ),
-                SizedBox(width: 12 * band.scale),
-              ],
+              if (canGoBack) SizedBox(width: 12 * band.scale),
               Expanded(
-                child: generating
-                    ? const Center(child: IssuingLoader(label: 'جارٍ الإصدار…'))
-                    : Tooltip(
-                        message: blockedReason ?? '',
-                        triggerMode: blockedReason == null
-                            ? TooltipTriggerMode.manual
-                            : TooltipTriggerMode.tap,
-                        child: BrandButton(
-                          label: isLast ? 'إصدار بطاقة الهوية' : 'متابعة',
-                          icon: isLast
-                              ? Icons.badge_outlined
-                              : Icons.arrow_back_rounded,
-                          large: true,
-                          muted: !canContinue,
-                          onPressed: onContinue,
-                        ),
-                      ),
+                child: Tooltip(
+                  message: blockedReason ?? '',
+                  child: BrandButton(
+                    label: isLast ? 'إصدار بطاقة الهوية' : 'متابعة',
+                    icon: isLast
+                        ? Icons.card_membership_rounded
+                        : Icons.arrow_forward_rounded,
+                    large: true,
+                    muted: !canContinue,
+                    onPressed: generating ? null : onContinue,
+                  ),
+                ),
               ),
-              if (canGoBack) ...[
-                SizedBox(width: 12 * band.scale),
-                SizedBox(width: 52 * band.scale),
-              ],
             ],
           ),
         ),
@@ -468,7 +460,7 @@ class StepHero extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'الخطوة $number من 3',
+                'الخطوة $number من 4',
                 style: textTheme.labelSmall?.copyWith(
                   color: BrandColors.goldDeep,
                   fontWeight: FontWeight.w700,

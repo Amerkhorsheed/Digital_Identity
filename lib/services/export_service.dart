@@ -405,7 +405,7 @@ abstract final class ExportService {
                             ),
                             pw.SizedBox(height: 6),
                             pw.Text(
-                              '${applicant.academicYear.label} · ${applicant.degreeLabel}',
+                              '${applicant.academicYear.label} · مواليد ${applicant.birthYear}',
                               style: pw.TextStyle(
                                 color: p.gold,
                                 fontSize: 10,
@@ -545,11 +545,13 @@ abstract final class ExportService {
                   runSpacing: 12,
                   children: [
                     detail('فصيلة الدم', applicant.bloodType.label),
+                    detail('سنة الميلاد', '${applicant.birthYear}'),
+                    detail('المحافظة', applicant.governorate),
                     detail('الطول', '${applicant.heightCm} سم'),
                     detail('الوزن', _formatWeight(applicant.weightKg)),
                     detail('العين اليمنى', applicant.rightEyeAcuity.label),
                     detail('العين اليسرى', applicant.leftEyeAcuity.label),
-                    detail('التصحيح', applicant.visionCorrection.label),
+                    detail('البصمة', applicant.hasBiometric ? 'موثقة' : 'غير مسجلة'),
                   ],
                 ),
                 pw.SizedBox(height: 12),

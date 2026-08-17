@@ -71,9 +71,8 @@ void main() {
     databaseFactory = databaseFactoryFfi;
     tempDir = Directory.systemTemp.createTempSync('a-id-restart');
     final photo = File('${tempDir.path}/portrait.png')
-      // A 1×1 PNG is enough: the flow only needs a readable file on disk.
       ..writeAsBytesSync([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, //
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
         0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
         0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
         0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
@@ -88,7 +87,7 @@ void main() {
 
   tearDownAll(() => tempDir.deleteSync(recursive: true));
 
-  testWidgets('“بدء تسجيل جديد” clears the journey and returns to step one',
+  testWidgets('“بدء تسجيل جديد” clears the journey and returns to step zero (Turn reservation)',
       (tester) async {
     tester.view.physicalSize = const Size(1200, 2400);
     tester.view.devicePixelRatio = 2.0;
@@ -102,39 +101,39 @@ void main() {
     await tester.pump(const Duration(milliseconds: 3400));
     await tester.pumpAndSettle();
 
-    // Step 1
-    await _enterText(tester, 0, 'سارة');
-    await _enterText(tester, 1, 'الحلبي');
+    // Step 0 — Turn Reservation
+    expect(find.text('مرحلة قطع الدور'), findsOneWidget);
+    expect(find.text('A-001'), findsWidgets);
+    await _tapText(tester, 'التالي');
+
+    // Step 1 — Identity
+    await _enterText(tester, 0, 'سارة محمد الحلبي');
+    await _enterText(tester, 1, '2001');
     await _selectDropdown(tester, 'المرحلة الدراسية', 'إجازة جامعية (بكالوريوس)');
-    await _selectDropdown(tester, 'التخصص الدراسي', 'هندسة وتكنولوجيا');
     await _selectDropdown(tester, 'المحافظة', 'ريف دمشق');
-    await _tapText(tester, 'اختر المدينة');
-    await tester.tap(find.text('دوما').last);
-    await tester.pumpAndSettle();
     await _tapText(tester, 'متابعة');
 
-    // Step 2
-    await _enterText(tester, 0, '165');
-    await _enterText(tester, 1, '58.5');
+    // Step 2 — Health
     await _selectDropdown(tester, 'فصيلة الدم', 'O+');
-    await _selectDropdown(tester, 'تصحيح الإبصار', 'نظارات');
-    await _tapText(tester, 'لديّ تقرير طبي جاهز');
+    await _tapText(tester, 'لديّ تقرير طبي جاهز (إدخال يدوي)');
     await _selectDropdown(tester, 'العين اليمنى — حدة الإبصار', '20/20');
     await _selectDropdown(tester, 'العين اليسرى — حدة الإبصار', '20/30');
     await _tapText(tester, 'متابعة');
 
-    // Step 3
+    // Step 3 — Photo & Biometric
     await _tapText(tester, 'التقاط صورة');
-    expect(find.text('تم التقاط الصورة — تبدو رائعة!'), findsOneWidget);
+    expect(find.text('تم التقاط الصورة — تبدو رائعة ومكتملة!'), findsOneWidget);
 
-    // From here on the result page pulses its success badge forever by
-    // design, so the test pumps explicit frames instead of settling.
+    // Tap biometric sensor
+    await _tapText(tester, 'المس المستشعر للمسح البيومتري من الجهاز');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1800));
+    await tester.pumpAndSettle();
+
     await tester.ensureVisible(find.text('إصدار بطاقة الهوية'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('إصدار بطاقة الهوية'));
     await tester.pump();
-    // Issuing hashes the ID and writes to SQLite — real async work that only
-    // progresses outside the fake-async test zone.
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 400)),
     );
@@ -150,19 +149,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 900));
     await tester.pumpAndSettle();
 
-    // Back at a genuinely blank step one — not the filled form the old build
-    // popped back to.
     expect(find.byType(IdResultPage), findsNothing);
-    expect(find.text('الهوية الشخصية'), findsOneWidget);
-    expect(find.text('سارة'), findsNothing);
-    expect(find.text('الحلبي'), findsNothing);
-    expect(find.text('دوما'), findsNothing);
-    expect(find.text('اختر المدينة'), findsNothing);
-    expect(find.text('اختر المحافظة أولًا'), findsOneWidget);
-    expect(find.text('متابعة'), findsOneWidget);
-
-    for (final field in tester.widgetList<TextField>(find.byType(TextField))) {
-      expect(field.controller?.text ?? '', isEmpty);
-    }
+    expect(find.text('مرحلة قطع الدور'), findsOneWidget);
+    expect(find.text('رقم دورك'), findsOneWidget);
+    expect(find.text('A-002'), findsWidgets);
+    expect(find.text('التالي'), findsOneWidget);
   });
 }

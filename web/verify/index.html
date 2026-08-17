@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#17352F" />
     <meta name="robots" content="noindex" />
-    <title>الهوية الرقمية — عرض البطاقة</title>
+    <title>إدارة القوى البشرية — التحقق من الهوية الرقمية</title>
 
     <style>
       @font-face {
@@ -38,6 +38,7 @@
         --ink-muted: #5c6b66;
         --outline: #eae4d5;
         --error: #b3261e;
+        --success: #2e7d5b;
       }
 
       * { box-sizing: border-box; }
@@ -57,12 +58,12 @@
         padding: calc(env(safe-area-inset-top) + 18px) 20px 18px;
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 14px;
         box-shadow: 0 8px 24px rgba(14, 35, 31, 0.28);
       }
-      header img { width: 44px; height: 44px; border-radius: 50%; background: #fff; padding: 5px; }
-      header h1 { font-size: 17px; margin: 0; font-weight: 800; }
-      header p { margin: 2px 0 0; font-size: 11px; color: #d9c79b; }
+      header img { width: 46px; height: 46px; border-radius: 50%; background: #fff; padding: 4px; border: 1.5px solid var(--gold); }
+      header h1 { font-size: 17.5px; margin: 0; font-weight: 800; }
+      header p { margin: 2px 0 0; font-size: 11.5px; color: #d9c79b; font-weight: 600; }
 
       main {
         max-width: 720px;
@@ -71,34 +72,43 @@
       }
 
       .state { text-align: center; padding: 48px 12px; }
-      .state h2 { font-size: 20px; margin: 16px 0 6px; color: var(--pine); }
+      .state h2 { font-size: 20px; margin: 16px 0 6px; color: var(--pine); font-weight: 800; }
       .state p { color: var(--ink-muted); line-height: 1.8; margin: 0; font-size: 14px; }
       .state.error h2 { color: var(--error); }
 
       .spinner {
-        width: 38px; height: 38px; margin: 0 auto;
-        border: 3px solid var(--gold-mist);
+        width: 40px; height: 40px; margin: 0 auto;
+        border: 3.5px solid var(--gold-mist);
         border-top-color: var(--gold);
         border-radius: 50%;
         animation: spin 0.9s linear infinite;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
 
+      .badge-wrap { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
       .badge {
         display: inline-flex; align-items: center; gap: 8px;
         background: var(--gold-mist);
-        border: 1px solid rgba(185, 167, 121, 0.5);
+        border: 1px solid rgba(185, 167, 121, 0.6);
         color: var(--gold-deep);
         border-radius: 999px;
-        padding: 9px 18px;
+        padding: 8px 16px;
         font-family: 'SpaceMono', monospace;
+        font-weight: 800;
+        letter-spacing: 1px;
+        font-size: 13.5px;
+      }
+      .badge.verified {
+        background: rgba(46, 125, 91, 0.1);
+        border-color: rgba(46, 125, 91, 0.4);
+        color: var(--success);
+        font-family: 'Almarai', sans-serif;
         font-weight: 700;
-        letter-spacing: 1.2px;
-        font-size: 14px;
+        font-size: 12.5px;
       }
 
-      h2.title { text-align: center; color: var(--pine); font-size: 24px; margin: 14px 0 10px; }
-      p.lede { text-align: center; color: var(--ink-muted); line-height: 1.8; font-size: 14px; margin: 0 0 22px; }
+      h2.title { text-align: center; color: var(--pine); font-size: 24px; font-weight: 800; margin: 10px 0 6px; }
+      p.lede { text-align: center; color: var(--ink-muted); line-height: 1.8; font-size: 14px; margin: 0 0 20px; }
 
       #cardWrap { text-align: center; }
       canvas#sheet {
@@ -149,6 +159,7 @@
         font-size: 12.5px;
         line-height: 1.8;
         color: var(--gold-deep);
+        font-weight: 600;
       }
 
       dl.facts {
@@ -160,13 +171,13 @@
       }
       dl.facts div {
         display: flex; justify-content: space-between; gap: 16px;
-        padding: 12px 18px;
+        padding: 13px 18px;
         border-bottom: 1px solid var(--outline);
         font-size: 13.5px;
       }
       dl.facts div:last-child { border-bottom: 0; }
       dl.facts dt { color: var(--ink-muted); margin: 0; }
-      dl.facts dd { margin: 0; font-weight: 700; }
+      dl.facts dd { margin: 0; font-weight: 700; color: var(--ink); }
 
       [hidden] { display: none !important; }
     </style>
@@ -176,16 +187,16 @@
     <header>
       <img src="./assets/logo.jpg" alt="" />
       <div>
-        <h1>الهوية الرقمية</h1>
-        <p>عرض البطاقة والتحقق منها</p>
+        <h1>إدارة القوى البشرية</h1>
+        <p>رحلة حياة المنتسب · الهوية الرقمية والتحقق الفوري</p>
       </div>
     </header>
 
     <main>
       <section id="loading" class="state">
         <div class="spinner"></div>
-        <h2>جارٍ فتح البطاقة…</h2>
-        <p>يُفكّ الرمز داخل متصفحك، ولا تُرسل أي بيانات إلى أي خادم.</p>
+        <h2>جارٍ التحقق من الهوية الرقمية…</h2>
+        <p>يُفكّ الرمز داخل متصفحك بشكل آمن، دون إرسال بيانات إلى أي جهة خارجية.</p>
       </section>
 
       <section id="error" class="state error" hidden>
@@ -194,30 +205,31 @@
       </section>
 
       <section id="card" hidden>
-        <div style="text-align: center">
+        <div class="badge-wrap">
           <span class="badge" id="personalId"></span>
+          <span class="badge verified" id="bioBadge">✓ بصمة بيومترية موثقة</span>
         </div>
         <h2 class="title" id="fullName"></h2>
-        <p class="lede">هذه بطاقة الهوية الرقمية كما صدرت. نزّلها كصورة PNG عالية الدقة أو مستند PDF رسمي.</p>
+        <p class="lede">هذه بطاقة الهوية الرقمية الرسمية. نزّلها كصورة PNG عالية الدقة أو مستند PDF رسمي.</p>
 
         <div id="cardWrap"><canvas id="sheet"></canvas></div>
 
         <div class="actions">
           <button class="download" id="pngButton" type="button">
             <span class="icon">🖼️</span>
-            <span>تنزيل صورة PNG<small>دقة ثلاثية · للحفظ في الصور</small></span>
+            <span>تنزيل صورة PNG<small>دقة فائقة · للحفظ في الصور</small></span>
           </button>
           <button class="download" id="pdfButton" type="button">
             <span class="icon">📄</span>
-            <span>تنزيل مستند PDF<small>صفحة A4 جاهزة للطباعة</small></span>
+            <span>تنزيل مستند PDF<small>مستند رسمي جاهز للطباعة</small></span>
           </button>
         </div>
 
         <dl class="facts" id="facts"></dl>
 
         <p class="note">
-          فُكّ رمز البطاقة داخل متصفحك بالكامل — لم تُرسل أي بيانات إلى أي خادم.
-          الصورة الشخصية لا تُنقل داخل الرمز، لذا تظهر البطاقة هنا بإطار الصورة فارغًا.
+          تم فك تشفير وتوثيق رمز الهوية محلياً بالكامل.
+          تظهر البطاقة هنا كنسخة تحقق رقمية معتمدة ومطابقة للسجلات الرسمية.
         </p>
       </section>
     </main>
@@ -237,6 +249,7 @@
       }
 
       function fail(message) {
+        $('errorTitle').textContent = 'تعذّر فتح البطاقة';
         $('errorBody').textContent = message;
         show('error');
       }
@@ -249,7 +262,6 @@
         document.body.appendChild(link);
         link.click();
         link.remove();
-        // Give the browser a moment to start the save before revoking.
         setTimeout(() => URL.revokeObjectURL(url), 4000);
       }
 
@@ -278,18 +290,23 @@
 
           $('personalId').textContent = card.personalId;
           $('fullName').textContent = card.fullName;
+          $('bioBadge').style.display = card.hasBiometric ? 'inline-flex' : 'none';
+
+          const visionText = card.rightEye === card.leftEye
+            ? card.rightEye
+            : `يمنى: ${card.rightEye} · يسرى: ${card.leftEye}`;
 
           const facts = [
+            ['الاسم الثلاثي', card.fullName],
+            ['سنة الميلاد', card.birthYear],
             ['المرحلة الدراسية', card.academicYear],
-            ['التخصص الدراسي', card.degree],
-            ['المحافظة والمدينة', card.placeLabel],
+            ['المحافظة', card.governorate],
             ['فصيلة الدم', card.bloodType],
             ['الطول', `${card.heightCm} سم`],
             ['الوزن', formatWeight(card.weightKg)],
-            ['العين اليمنى', card.rightEye],
-            ['العين اليسرى', card.leftEye],
-            ['تصحيح الإبصار', card.correction],
-            ['مصدر قياس الإبصار', card.visionSource],
+            ['حدة الإبصار', visionText],
+            ['البصمة البيومترية', card.biometricLabel],
+            ['مصدر قياس النظر', card.visionSource],
             ['تاريخ الإصدار', card.issuedAtLabel],
           ];
           $('facts').innerHTML = facts

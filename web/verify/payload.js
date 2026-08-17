@@ -21,14 +21,10 @@ const ACADEMIC_YEARS = [
 
 const BLOOD_TYPES = ['A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−'];
 
-// يجب أن يطابق ترتيب VisualAcuity في lib/models/applicant.dart — الرمز يخزّن
-// ترتيب القيمة لا نصّها، فأي إدراج في الوسط يُفسد البطاقات المطبوعة.
 const ACUITIES = [
   '20/10', '20/13', '20/16', '20/20', '20/25', '20/30',
   '20/40', '20/50', '20/70', '20/100', '20/200', 'أسوأ من 20/200',
 ];
-
-const CORRECTIONS = ['بدون', 'نظارات', 'عدسات لاصقة'];
 
 const MONTHS = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
@@ -78,22 +74,23 @@ function toCard(map) {
     list[Number.isInteger(index) && index >= 0 && index < list.length ? index : 0];
 
   const governorate = map.g || '';
-  const city = map.c || '';
+  const birthYear = map.a || 2001;
+  const hasBiometric = map.p !== 0;
 
   return {
     personalId: map.i || '',
     fullName: (map.n || '').trim(),
+    birthYear,
     academicYear: pick(ACADEMIC_YEARS, map.y),
-    degree: map.d || '',
     governorate,
-    city,
-    placeLabel: city && city !== governorate ? `${city}، ${governorate}` : governorate,
+    placeLabel: governorate,
     heightCm: map.h || 0,
     weightKg: (map.w || 0) / 10,
     bloodType: pick(BLOOD_TYPES, map.b),
     rightEye: pick(ACUITIES, map.r),
     leftEye: pick(ACUITIES, map.l),
-    correction: pick(CORRECTIONS, map.x),
+    hasBiometric,
+    biometricLabel: hasBiometric ? 'موثقة بيومترياً' : 'غير مسجلة',
     visionDistanceCm: typeof map.m === 'number' ? map.m : null,
     visionSource:
       typeof map.m === 'number' ? `فحص تفاعلي · ${map.m} سم` : 'إدخال يدوي',
@@ -113,32 +110,31 @@ export function formatWeight(kg) {
 // ------------------------------------------------------------------ plumbing
 
 function base64UrlDecode(text) {
-  const padded = text.replace(/-/g, '+').replace(/_/g, '/');
-  const binary = atob(padded + '='.repeat((4 - (padded.length % 4)) % 4));
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  let s = text.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4 !== 0) s += '=';
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
+}
+
+function crc16(bytes) {
+  let crc = 0xffff;
+  for (let i = 0; i < bytes.length; i++) {
+    crc ^= bytes[i] << 8;
+    for (let bit = 0; bit < 8; bit++) {
+      crc = (crc & 0x8000) !== 0 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+    }
+  }
+  return crc;
 }
 
 async function gunzip(bytes) {
   if (typeof DecompressionStream === 'undefined') {
-    throw new CardError('متصفحك قديم ولا يدعم فك الضغط. جرّب متصفحًا أحدث.');
+    throw new CardError('المتصفح لا يدعم فك الضغط التلقائي.');
   }
-  const stream = new Blob([bytes]).stream().pipeThrough(
-    new DecompressionStream('gzip'),
-  );
-  return new Uint8Array(await new Response(stream).arrayBuffer());
-}
-
-/// CRC-16/CCITT-FALSE, identical to the Dart side.
-function crc16(bytes) {
-  let crc = 0xffff;
-  for (const byte of bytes) {
-    crc ^= byte << 8;
-    for (let i = 0; i < 8; i++) {
-      crc = (crc & 0x8000) !== 0 ? ((crc << 1) ^ 0x1021) : (crc << 1);
-      crc &= 0xffff;
-    }
-  }
-  return crc;
+  const ds = new DecompressionStream('gzip');
+  const stream = new Response(new Blob([bytes])).body.pipeThrough(ds);
+  const ab = await new Response(stream).arrayBuffer();
+  return new Uint8Array(ab);
 }

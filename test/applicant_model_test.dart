@@ -15,14 +15,6 @@ void main() {
     });
   });
 
-  group('UndergraduateDegree', () {
-    test('round-trips through its label', () {
-      for (final degree in UndergraduateDegree.values) {
-        expect(UndergraduateDegree.fromLabel(degree.label), degree);
-      }
-    });
-  });
-
   group('BloodType', () {
     test('covers the full ABO/Rh matrix', () {
       expect(BloodType.values, hasLength(8));
@@ -44,95 +36,45 @@ void main() {
     });
   });
 
-  group('VisionCorrection', () {
-    test('round-trips through its label', () {
-      expect(VisionCorrection.fromLabel('نظارات'), VisionCorrection.glasses);
-      expect(VisionCorrection.fromLabel('بدون'), VisionCorrection.none);
-      expect(VisionCorrection.fromLabel('Laser'), isNull);
-    });
-  });
-
   group('Applicant', () {
     const base = Applicant(
-      firstName: 'Sara',
-      lastName: 'Almaziad',
+      fullName: 'سارة محمد المزيد',
+      birthYear: 2001,
       academicYear: AcademicYear.bachelor,
-      degree: UndergraduateDegree.engineering,
       governorate: 'دمشق',
-      city: 'المزة',
       heightCm: 165,
       weightKg: 58.5,
       bloodType: BloodType.oPositive,
       rightEyeAcuity: VisualAcuity.twentyTwenty,
       leftEyeAcuity: VisualAcuity.twentyTwenty,
-      visionCorrection: VisionCorrection.none,
+      hasBiometric: true,
       photoPath: '/tmp/photo.jpg',
     );
 
     test('composes the full name', () {
-      expect(base.fullName, 'Sara Almaziad');
+      expect(base.fullName, 'سارة محمد المزيد');
     });
 
-    test('renders the place as city then governorate', () {
-      expect(base.placeLabel, 'المزة، دمشق');
-    });
-
-    test('collapses the place when the city is the governorate seat', () {
-      const seat = Applicant(
-        firstName: 'A',
-        lastName: 'B',
-        academicYear: AcademicYear.bachelor,
-        degree: UndergraduateDegree.arts,
-        governorate: 'حلب',
-        city: 'حلب',
-        heightCm: 170,
-        weightKg: 70,
-        bloodType: BloodType.oPositive,
-        rightEyeAcuity: VisualAcuity.twentyTwenty,
-        leftEyeAcuity: VisualAcuity.twentyTwenty,
-        visionCorrection: VisionCorrection.none,
-      );
-      expect(seat.placeLabel, 'حلب');
+    test('renders the place as governorate', () {
+      expect(base.placeLabel, 'دمشق');
     });
 
     test('falls back to a manual vision source without a test report', () {
       expect(base.visionSourceLabel, 'إدخال يدوي من تقرير سابق');
     });
 
-    test('uses the custom degree label when Other is selected', () {
-      const other = Applicant(
-        firstName: 'A',
-        lastName: 'B',
-        academicYear: AcademicYear.bachelor,
-        degree: UndergraduateDegree.other,
-        customDegree: 'B.A. Fine Arts',
-        governorate: 'حلب',
-        city: 'حلب',
-        heightCm: 180,
-        weightKg: 75,
-        bloodType: BloodType.aPositive,
-        rightEyeAcuity: VisualAcuity.twentyTwenty,
-        leftEyeAcuity: VisualAcuity.twentyTwenty,
-        visionCorrection: VisionCorrection.none,
-      );
-      expect(other.degreeLabel, 'B.A. Fine Arts');
-    });
-
     test('hasPhoto reflects the photo path', () {
       expect(base.hasPhoto, isTrue);
       const noPhoto = Applicant(
-        firstName: 'A',
-        lastName: 'B',
-        academicYear: AcademicYear.bachelor,
-        degree: UndergraduateDegree.arts,
+        fullName: 'عمر خالد الحداد',
+        birthYear: 1999,
+        academicYear: AcademicYear.master,
         governorate: 'حمص',
-        city: 'تدمر',
         heightCm: 170,
         weightKg: 70,
         bloodType: BloodType.oPositive,
         rightEyeAcuity: VisualAcuity.twentyTwenty,
         leftEyeAcuity: VisualAcuity.twentyTwenty,
-        visionCorrection: VisionCorrection.none,
       );
       expect(noPhoto.hasPhoto, isFalse);
     });

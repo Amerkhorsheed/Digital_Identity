@@ -9,18 +9,17 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _applicant = Applicant(
-  firstName: 'سارة',
-  lastName: 'المزيد',
+  turnNumber: 'A-001',
+  fullName: 'سارة محمد المزيد',
+  birthYear: 2001,
   academicYear: AcademicYear.bachelor,
-  degree: UndergraduateDegree.engineering,
   governorate: 'دمشق',
-  city: 'المزة',
   heightCm: 165,
   weightKg: 58.5,
   bloodType: BloodType.oPositive,
   rightEyeAcuity: VisualAcuity.twentyTwenty,
   leftEyeAcuity: VisualAcuity.twentyTwentyFive,
-  visionCorrection: VisionCorrection.glasses,
+  hasBiometric: true,
 );
 
 Future<void> _selectDropdown(
@@ -61,7 +60,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-  testWidgets('walks through all three registration steps in Arabic',
+  testWidgets('walks through all registration steps including turn reservation in Arabic',
       (tester) async {
     tester.view.physicalSize = const Size(1200, 2400);
     tester.view.devicePixelRatio = 2.0;
@@ -73,35 +72,29 @@ void main() {
     await tester.pump(const Duration(milliseconds: 3400));
     await tester.pumpAndSettle();
 
+    // Step 0 — Turn Reservation
+    expect(find.text('مرحلة قطع الدور'), findsOneWidget);
+    expect(find.text('رقم دورك'), findsOneWidget);
+    expect(find.text('A-001'), findsWidgets);
+    await tester.tap(find.text('التالي'));
+    await tester.pumpAndSettle();
+
     // Step 1 — identity
     expect(find.text('الهوية الشخصية'), findsOneWidget);
-    await _enterText(tester, 0, 'سارة');
-    await _enterText(tester, 1, 'المزيد');
+    await _enterText(tester, 0, 'سارة محمد المزيد');
+    await _enterText(tester, 1, '2001');
     await _selectDropdown(tester, 'المرحلة الدراسية', 'إجازة جامعية (بكالوريوس)');
-    await _selectDropdown(tester, 'التخصص الدراسي', 'هندسة وتكنولوجيا');
     await _selectDropdown(tester, 'المحافظة', 'دمشق');
-
-    // The city picker is a searchable sheet, not a dropdown.
-    await tester.tap(find.text('اختر المدينة'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).last, 'المزة');
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('المزة').last);
-    await tester.pumpAndSettle();
-    expect(find.text('المزة'), findsOneWidget);
 
     await tester.tap(find.text('متابعة'));
     await tester.pumpAndSettle();
 
     // Step 2 — health
     expect(find.text('الملف الصحي'), findsOneWidget);
-    await _enterText(tester, 0, '165');
-    await _enterText(tester, 1, '58.5');
     await _selectDropdown(tester, 'فصيلة الدم', 'O+');
-    await _selectDropdown(tester, 'تصحيح الإبصار', 'نظارات');
 
     // The eye test is required before the step can be completed.
-    expect(find.text('ابدأ فحص النظر'), findsOneWidget);
+    expect(find.text('بدء فحص النظر السريع الآن'), findsOneWidget);
     await tester.tap(find.text('متابعة'));
     await tester.pumpAndSettle();
     expect(
@@ -110,7 +103,7 @@ void main() {
     );
 
     // Manual entry satisfies it for users holding an optometrist's report.
-    await tester.tap(find.text('لديّ تقرير طبي جاهز'));
+    await tester.tap(find.text('لديّ تقرير طبي جاهز (إدخال يدوي)'));
     await tester.pumpAndSettle();
     await _selectDropdown(tester, 'العين اليمنى — حدة الإبصار', '20/20');
     await _selectDropdown(tester, 'العين اليسرى — حدة الإبصار', '20/25');
@@ -118,10 +111,11 @@ void main() {
     await tester.tap(find.text('متابعة'));
     await tester.pumpAndSettle();
 
-    // Step 3 — photo, with validation message once the user tries to issue
-    expect(find.text('الصورة الشخصية'), findsNWidgets(2));
+    // Step 3 — photo & biometric
+    expect(find.text('الصورة والبصمة البيومترية'), findsOneWidget);
     expect(find.text('التقاط صورة'), findsOneWidget);
-    expect(find.text('اختيار من المكتبة'), findsOneWidget);
+    expect(find.text('اختيار من المكتبة'), findsNothing);
+    expect(find.text('المسح والتوثيق البيومتري الحقيقي'), findsOneWidget);
 
     await tester.tap(find.text('إصدار بطاقة الهوية'));
     await tester.pumpAndSettle();
@@ -149,8 +143,10 @@ void main() {
 
     expect(find.text('بطاقة هويتك جاهزة'), findsOneWidget);
     expect(find.textContaining('A-260816-TEST12'), findsWidgets);
-    expect(find.text('تنزيل صورة PNG'), findsOneWidget);
-    expect(find.text('تنزيل مستند PDF'), findsOneWidget);
+    expect(find.text('تنزيل صورة PNG'), findsNothing);
+    expect(find.text('تنزيل مستند PDF'), findsNothing);
+    expect(find.text('طباعة أو حفظ في الملفات'), findsNothing);
+    expect(find.text('البيانات المضمنة في الرمز'), findsNothing);
     expect(find.text('بدء تسجيل جديد'), findsOneWidget);
 
     // The card opens on its front face and holds there — no endless spin.
@@ -165,7 +161,6 @@ void main() {
     expect(find.byType(QrImageView), findsOneWidget);
     expect(find.text('بيانات الهوية'), findsOneWidget);
 
-    // …and it stays put: the old build spun forever after one tap.
     await tester.pump(const Duration(seconds: 3));
     expect(find.text('إظهار وجه البطاقة'), findsOneWidget);
     expect(find.byType(QrImageView), findsOneWidget);
@@ -176,8 +171,6 @@ void main() {
     tester.view.devicePixelRatio = 2.0;
     addTearDown(tester.view.reset);
 
-    // The result page reports the restart by popping `true`; the registration
-    // flow is what acts on it. Here we verify the contract at the seam.
     bool? popped;
     await tester.pumpWidget(
       MaterialApp(
@@ -213,12 +206,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 
-    // Previously this popped without a result, dropping the user back onto a
-    // form still filled with the applicant they had just issued.
     expect(popped, isTrue);
   });
 
-  testWidgets('a scanned card is framed for download, not for re-issuing',
+  testWidgets('a scanned card is framed for viewing, not for re-issuing',
       (tester) async {
     tester.view.physicalSize = const Size(1200, 2400);
     tester.view.devicePixelRatio = 2.0;
@@ -239,8 +230,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1000));
 
     expect(find.text('تمت قراءة البطاقة'), findsOneWidget);
-    expect(find.text('تنزيل صورة PNG'), findsOneWidget);
-    expect(find.text('تنزيل مستند PDF'), findsOneWidget);
+    expect(find.text('تنزيل صورة PNG'), findsNothing);
+    expect(find.text('تنزيل مستند PDF'), findsNothing);
     expect(find.text('مسح بطاقة أخرى'), findsOneWidget);
     expect(find.text('بدء تسجيل جديد'), findsNothing);
   });

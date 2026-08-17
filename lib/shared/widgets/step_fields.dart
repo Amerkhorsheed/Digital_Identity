@@ -188,8 +188,12 @@ class BrandTextField extends StatelessWidget {
     required this.label,
     required this.controller,
     required this.onChanged,
+    this.hint,
     this.error,
     this.icon,
+    this.keyboardType,
+    this.inputFormatters,
+    this.textDirection,
     this.textCapitalization = TextCapitalization.words,
     this.maxLength,
   });
@@ -197,8 +201,12 @@ class BrandTextField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
+  final String? hint;
   final String? error;
   final IconData? icon;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final TextDirection? textDirection;
   final TextCapitalization textCapitalization;
   final int? maxLength;
 
@@ -211,6 +219,9 @@ class BrandTextField extends StatelessWidget {
         FieldLabel(text: label, error: error),
         TextField(
           controller: controller,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          textDirection: textDirection,
           textCapitalization: textCapitalization,
           textInputAction: TextInputAction.next,
           maxLength: maxLength,
@@ -220,6 +231,10 @@ class BrandTextField extends StatelessWidget {
               ),
           decoration: InputDecoration(
             counterText: '',
+            hintText: hint,
+            hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: BrandColors.inkMuted,
+                ),
             prefixIcon: icon == null ? null : Icon(icon, size: 20),
             errorText: error == null ? null : ' ',
             errorStyle: const TextStyle(height: 0.4),

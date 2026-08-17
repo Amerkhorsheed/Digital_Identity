@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -9,7 +7,6 @@ import '../../app/theme/brand_colors.dart';
 import '../../config/verify_endpoint.dart';
 import '../../models/applicant.dart';
 import '../../services/export_service.dart';
-import '../../services/id_engine.dart';
 import '../../shared/widgets/adaptive_layout.dart';
 import '../../shared/widgets/animations.dart';
 import '../../shared/widgets/ornament_background.dart';
@@ -20,8 +17,7 @@ import 'qr_presenter.dart';
 /// action: a card you just issued, or someone else's card you just scanned.
 enum IdResultMode { issued, scanned }
 
-/// Final screen: the identity card, flippable in 3D, ready to be saved as a
-/// high-resolution PNG or a printable PDF certificate.
+/// Final screen: the identity card, flippable in 3D with full front and back details.
 class IdResultPage extends StatefulWidget {
   const IdResultPage({
     super.key,
@@ -42,23 +38,12 @@ class IdResultPage extends StatefulWidget {
 
 class _IdResultPageState extends State<IdResultPage>
     with TickerProviderStateMixin {
-  /// 0 = front, 1 = back. Never repeats — it settles on a face and stays there.
+  /// 0 = front, 1 = back. Settles on a face and stays there.
   late final AnimationController _flip;
   late final AnimationController _reveal;
 
-  final GlobalKey _pngButtonKey = GlobalKey();
-  final GlobalKey _pdfButtonKey = GlobalKey();
-
   /// The string drawn into the QR: a link that rebuilds this exact card.
   late final String _qrData;
-
-  /// The same identity as readable JSON, for the "what's in the code" panel.
-  late final String _readablePayload;
-
-  bool _busyPng = false;
-  bool _busyPdf = false;
-  bool _busyPrint = false;
-  bool _showJson = false;
 
   @override
   void initState() {
@@ -67,11 +52,6 @@ class _IdResultPageState extends State<IdResultPage>
       applicant: widget.applicant,
       personalId: widget.personalId,
       issuedAt: widget.issuedAt,
-    );
-    _readablePayload = IdEngine.buildQrPayload(
-      widget.applicant,
-      widget.personalId,
-      widget.issuedAt,
     );
     _flip = AnimationController(
       vsync: this,
@@ -173,29 +153,9 @@ class _IdResultPageState extends State<IdResultPage>
                         onToggle: _toggleFlip,
                         onPresent: _presentQr,
                       ),
-                      const SizedBox(height: 24),
-                      _DownloadPanel(
-                        pngKey: _pngButtonKey,
-                        pdfKey: _pdfButtonKey,
-                        busyPng: _busyPng,
-                        busyPdf: _busyPdf,
-                        busyPrint: _busyPrint,
-                        onPng: _downloadPng,
-                        onPdf: _downloadPdf,
-                        onPrint: _printPdf,
-                      ),
-                      const SizedBox(height: 24),
-                      _IdentityPayload(
-                        payload: _readablePayload,
-                        expanded: _showJson,
-                        onToggle: () => setState(() => _showJson = !_showJson),
-                      ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 32),
                       Center(
                         child: OutlinedButton.icon(
-                          // `true` tells the registration flow to reset; the
-                          // old build only popped, landing the user back on a
-                          // form still full of the previous applicant.
                           onPressed: () => Navigator.of(context).pop(true),
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size(180, 52),
@@ -227,144 +187,6 @@ class _IdResultPageState extends State<IdResultPage>
       ),
     );
   }
-
-  // ------------------------------------------------------------- التصدير
-
-  Rect? _originOf(GlobalKey key) {
-    final box = key.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null || !box.hasSize) return null;
-    return box.localToGlobal(Offset.zero) & box.size;
-  }
-
-  Future<void> _downloadPng() async {
-    await _runExport(
-      setBusy: (busy) => setState(() => _busyPng = busy),
-      origin: _originOf(_pngButtonKey),
-      export: () => ExportService.exportPng(
-        applicant: widget.applicant,
-        personalId: widget.personalId,
-        issuedAt: widget.issuedAt,
-      ),
-    );
-  }
-
-  Future<void> _downloadPdf() async {
-    await _runExport(
-      setBusy: (busy) => setState(() => _busyPdf = busy),
-      origin: _originOf(_pdfButtonKey),
-      export: () => ExportService.exportPdf(
-        applicant: widget.applicant,
-        personalId: widget.personalId,
-        issuedAt: widget.issuedAt,
-      ),
-    );
-  }
-
-  Future<void> _printPdf() async {
-    setState(() => _busyPrint = true);
-    try {
-      await ExportService.printPdf(
-        applicant: widget.applicant,
-        personalId: widget.personalId,
-        issuedAt: widget.issuedAt,
-      );
-    } catch (error) {
-      _reportFailure(error);
-    } finally {
-      if (mounted) setState(() => _busyPrint = false);
-    }
-  }
-
-  Future<void> _runExport({
-    required ValueChanged<bool> setBusy,
-    required Future<File> Function() export,
-    Rect? origin,
-  }) async {
-    setBusy(true);
-    try {
-      final file = await export();
-      if (!mounted) return;
-      await ExportService.share(
-        context,
-        file,
-        origin: origin,
-        subject: 'بطاقة الهوية الرقمية — ${widget.personalId}',
-      );
-      if (!mounted) return;
-      _report(
-        'تم تجهيز الملف: ${file.uri.pathSegments.last}',
-        icon: Icons.check_circle_outline_rounded,
-      );
-    } catch (error) {
-      _reportFailure(error);
-    } finally {
-      if (mounted) setBusy(false);
-    }
-  }
-
-  void _reportFailure(Object error) {
-    if (!mounted) return;
-    _report(
-      'تعذّر إتمام العملية. حاول مرة أخرى.',
-      icon: Icons.error_outline_rounded,
-      error: true,
-      detail: error.toString(),
-    );
-  }
-
-  void _report(
-    String message, {
-    required IconData icon,
-    bool error = false,
-    String? detail,
-  }) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          backgroundColor: error ? BrandColors.error : BrandColors.pine,
-          content: Row(
-            children: [
-              Icon(icon, color: Colors.white, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  message,
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-          action: detail == null
-              ? null
-              : SnackBarAction(
-                  label: 'التفاصيل',
-                  textColor: Colors.white,
-                  onPressed: () => showDialog<void>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('تفاصيل الخطأ'),
-                      content: SingleChildScrollView(
-                        child: SelectableText(
-                          detail,
-                          style: const TextStyle(
-                            fontFamily: 'SpaceMono',
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('إغلاق'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-        ),
-      );
-  }
 }
 
 // ---------------------------------------------------------------- الترويسة
@@ -383,7 +205,9 @@ class _SuccessHeader extends StatelessWidget {
     return Entrance(
       child: Column(
         children: [
-          _SuccessBadge(icon: issued ? Icons.check_rounded : Icons.verified_rounded),
+          _SuccessBadge(
+            icon: issued ? Icons.check_rounded : Icons.verified_rounded,
+          ),
           const SizedBox(height: 18),
           Text(
             issued ? 'بطاقة هويتك جاهزة' : 'تمت قراءة البطاقة',
@@ -398,10 +222,8 @@ class _SuccessHeader extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             issued
-                ? 'اقلب البطاقة لرؤية رمز QR، ثم نزّلها كصورة PNG عالية الدقة '
-                    'أو مستند PDF رسمي قابل للطباعة.'
-                : 'أُعيد بناء البطاقة من رمز QR. نزّلها الآن كصورة PNG عالية '
-                    'الدقة أو مستند PDF رسمي قابل للطباعة.',
+                ? 'تم إصدار بطاقتك بنجاح. يمكنك معاينة وجهي البطاقة ورمز QR.'
+                : 'تمت قراءة بيانات البطاقة ومعاينتها بنجاح.',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
               color: BrandColors.inkMuted,
@@ -577,7 +399,8 @@ class _FlipStage extends StatelessWidget {
 
   void _onDragUpdate(DragUpdateDetails details) {
     // A full flip takes roughly the width of the card in drag distance.
-    flip.value = (flip.value - details.primaryDelta! / cardWidth).clamp(0.0, 1.0);
+    flip.value =
+        (flip.value - details.primaryDelta! / cardWidth).clamp(0.0, 1.0);
   }
 
   void _onDragEnd(DragEndDetails details) {
@@ -720,306 +543,5 @@ class _FaceDot extends StatelessWidget {
             ),
       ),
     );
-  }
-}
-
-// ------------------------------------------------------------------ التنزيل
-
-class _DownloadPanel extends StatelessWidget {
-  const _DownloadPanel({
-    required this.pngKey,
-    required this.pdfKey,
-    required this.busyPng,
-    required this.busyPdf,
-    required this.busyPrint,
-    required this.onPng,
-    required this.onPdf,
-    required this.onPrint,
-  });
-
-  final GlobalKey pngKey;
-  final GlobalKey pdfKey;
-  final bool busyPng;
-  final bool busyPdf;
-  final bool busyPrint;
-  final VoidCallback onPng;
-  final VoidCallback onPdf;
-  final VoidCallback onPrint;
-
-  @override
-  Widget build(BuildContext context) {
-    final band = Adaptive.bandOf(context);
-    final actions = [
-      _DownloadAction(
-        buttonKey: pngKey,
-        icon: Icons.image_outlined,
-        title: 'صورة PNG',
-        subtitle: 'دقة ثلاثية · جاهزة للحفظ في الصور',
-        busy: busyPng,
-        onTap: onPng,
-      ),
-      _DownloadAction(
-        buttonKey: pdfKey,
-        icon: Icons.picture_as_pdf_outlined,
-        title: 'مستند PDF',
-        subtitle: 'شهادة A4 رسمية بالوجهين',
-        busy: busyPdf,
-        onTap: onPdf,
-      ),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (band.isCompact)
-          Column(
-            children: [
-              for (var i = 0; i < actions.length; i++) ...[
-                actions[i],
-                if (i != actions.length - 1) const SizedBox(height: 12),
-              ],
-            ],
-          )
-        else
-          // IntrinsicHeight keeps both cards the same height inside a
-          // vertically unbounded scroll view.
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < actions.length; i++) ...[
-                  Expanded(child: actions[i]),
-                  if (i != actions.length - 1) const SizedBox(width: 16),
-                ],
-              ],
-            ),
-          ),
-        const SizedBox(height: 12),
-        Center(
-          child: TextButton.icon(
-            onPressed: busyPrint ? null : onPrint,
-            icon: busyPrint
-                ? const SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.print_outlined, size: 18),
-            label: const Text('طباعة أو حفظ في الملفات'),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DownloadAction extends StatelessWidget {
-  const _DownloadAction({
-    required this.buttonKey,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.busy,
-    required this.onTap,
-  });
-
-  final GlobalKey buttonKey;
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool busy;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      key: buttonKey,
-      color: BrandColors.pine,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: busy ? null : onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: const LinearGradient(
-              colors: [BrandColors.pineRaised, BrandColors.pine],
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: BrandColors.gold.withValues(alpha: 0.18),
-                  border: Border.all(
-                    color: BrandColors.gold.withValues(alpha: 0.5),
-                  ),
-                ),
-                child: busy
-                    ? const Padding(
-                        padding: EdgeInsets.all(13),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.6,
-                          color: BrandColors.goldGlow,
-                        ),
-                      )
-                    : Icon(icon, color: BrandColors.goldGlow, size: 22),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      busy ? 'جارٍ التجهيز…' : 'تنزيل $title',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color:
-                                BrandColors.goldGlow.withValues(alpha: 0.85),
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.download_for_offline_outlined,
-                color: BrandColors.goldGlow,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ------------------------------------------------------------------ الحمولة
-
-class _IdentityPayload extends StatelessWidget {
-  const _IdentityPayload({
-    required this.payload,
-    required this.expanded,
-    required this.onToggle,
-  });
-
-  final String payload;
-  final bool expanded;
-  final VoidCallback onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    final data = jsonDecode(payload) as Map<String, dynamic>;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: BrandColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: BrandColors.outlineSoft),
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: onToggle,
-            borderRadius: BorderRadius.circular(20),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.data_object_rounded,
-                    color: BrandColors.goldDeep,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'البيانات المضمنة في الرمز',
-                          style:
-                              Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    color: BrandColors.pine,
-                                  ),
-                        ),
-                        Text(
-                          '${data.length} حقول مشفّرة داخل رمز QR',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: BrandColors.inkMuted,
-                                  ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  AnimatedRotation(
-                    turns: expanded ? 0.5 : 0,
-                    duration: BrandDurations.quick,
-                    child: const Icon(
-                      Icons.expand_more_rounded,
-                      color: BrandColors.pine,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          AnimatedCrossFade(
-            duration: BrandDurations.standard,
-            crossFadeState:
-                expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-            firstChild: const SizedBox(width: double.infinity, height: 0),
-            secondChild: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: BrandColors.pineMist,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SelectableText(
-                    _prettyPayload(data),
-                    style: const TextStyle(
-                      fontFamily: 'SpaceMono',
-                      fontSize: 12,
-                      height: 1.6,
-                      color: BrandColors.pineDeep,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _prettyPayload(Map<String, dynamic> data) {
-    final lines = data.entries.map((e) => '"${e.key}": ${_quote(e.value)}');
-    return '{\n  ${lines.join(',\n  ')}\n}';
-  }
-
-  static String _quote(Object? value) {
-    if (value is String) return '"$value"';
-    return '$value';
   }
 }

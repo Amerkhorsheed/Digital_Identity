@@ -7,24 +7,24 @@ import '../../../shared/widgets/brand_widgets.dart';
 
 /// The persistent brand header shown on every registration screen.
 ///
-/// Carries the A logo, the product wordmark and the live step indicator so the
-/// user always knows where they are in the journey.
-///
-/// The pine block paints edge-to-edge *behind* the status bar / notch while its
-/// content sits inside the safe area, so the header lines up with the physical
-/// top of the screen on every device instead of sliding under the clock.
+/// Carries the logo/emblem, the wordmark, the current turn ticket badge (e.g. A-001),
+/// and the live step indicator so the user always knows where they are in the journey.
 class FlowHeader extends StatelessWidget {
   const FlowHeader({
     super.key,
     required this.currentStep,
     required this.totalSteps,
     required this.stepTitles,
+    this.turnNumber = 'A-001',
+    this.onResetTurn,
     this.onScan,
   });
 
   final int currentStep;
   final int totalSteps;
   final List<String> stepTitles;
+  final String turnNumber;
+  final VoidCallback? onResetTurn;
 
   /// Opens the card scanner. Hidden when null.
   final VoidCallback? onScan;
@@ -35,9 +35,7 @@ class FlowHeader extends StatelessWidget {
     final short = Adaptive.isShort(context);
     final scale = band.scale;
 
-    // On a short screen (phone landscape, keyboard open) the brand row folds
-    // away and only the stepper stays, so the form keeps the room it needs.
-    final vertical = short ? 10.0 : 16.0 * scale;
+    final vertical = short ? 8.0 : 14.0 * scale;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -70,19 +68,22 @@ class FlowHeader extends StatelessWidget {
                       horizontal: band.gutter,
                       vertical: vertical,
                     ),
-                    child: _BrandRow(band: band, onScan: onScan),
+                    child: _BrandRow(
+                      band: band,
+                      turnNumber: turnNumber,
+                      onResetTurn: onResetTurn,
+                      onScan: onScan,
+                    ),
                   ),
                 Container(
                   height: 1,
                   color: BrandColors.gold.withValues(alpha: 0.35),
                 ),
                 ResponsiveShell(
-                  // The stepper stays compact on wide screens; stretched to a
-                  // TV's full width the connectors would swamp the nodes.
                   maxWidth: band.isCompact ? double.infinity : 760,
                   padding: EdgeInsets.symmetric(
                     horizontal: band.gutter,
-                    vertical: short ? 10 : 14 * scale,
+                    vertical: short ? 8 : 12 * scale,
                   ),
                   child: StepIndicator(
                     currentStep: currentStep,
@@ -99,37 +100,44 @@ class FlowHeader extends StatelessWidget {
 }
 
 class _BrandRow extends StatelessWidget {
-  const _BrandRow({required this.band, this.onScan});
+  const _BrandRow({
+    required this.band,
+    required this.turnNumber,
+    this.onResetTurn,
+    this.onScan,
+  });
 
   final ScreenBand band;
+  final String turnNumber;
+  final VoidCallback? onResetTurn;
   final VoidCallback? onScan;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final logoSize = 44.0 * band.scale;
+    final logoSize = 42.0 * band.scale;
 
     return Row(
       children: [
         BrandLogo(size: logoSize),
-        SizedBox(width: 14 * band.scale),
+        SizedBox(width: 12 * band.scale),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'الهوية الرقمية',
+                'إدارة القوى البشرية',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.titleMedium?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
-                  fontSize: (textTheme.titleMedium?.fontSize ?? 16) * band.scale,
+                  fontSize: (textTheme.titleMedium?.fontSize ?? 15) * band.scale,
                 ),
               ),
               Text(
-                'مركز التسجيل والإصدار',
+                'رحلة حياة المنتسب · الهوية الرقمية',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.labelSmall?.copyWith(
@@ -140,11 +148,55 @@ class _BrandRow extends StatelessWidget {
             ],
           ),
         ),
-        if (band.isWide) ...[
-          _SecurityBadge(band: band),
-          SizedBox(width: 8 * band.scale),
+        // Turn ticket pill badge
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: 12 * band.scale,
+            vertical: 4 * band.scale,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(BrandRadii.pill),
+            border: Border.all(
+              color: BrandColors.goldGlow.withValues(alpha: 0.8),
+              width: 1.2,
+            ),
+            color: BrandColors.gold.withValues(alpha: 0.15),
+          ),
+          child: Text(
+            turnNumber,
+            style: TextStyle(
+              color: BrandColors.goldGlow,
+              fontFamily: 'SpaceMono',
+              fontWeight: FontWeight.w800,
+              fontSize: 13 * band.scale,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        if (onResetTurn != null) ...[
+          SizedBox(width: 6 * band.scale),
+          Tooltip(
+            message: 'سحب دور جديد',
+            child: Material(
+              color: Colors.transparent,
+              shape: const CircleBorder(),
+              child: InkWell(
+                onTap: onResetTurn,
+                customBorder: const CircleBorder(),
+                child: Padding(
+                  padding: EdgeInsets.all(6 * band.scale),
+                  child: Icon(
+                    Icons.refresh_rounded,
+                    size: 20 * band.scale,
+                    color: Colors.white70,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
-        if (onScan != null)
+        if (onScan != null) ...[
+          SizedBox(width: 6 * band.scale),
           Tooltip(
             message: 'مسح بطاقة',
             child: Material(
@@ -154,59 +206,18 @@ class _BrandRow extends StatelessWidget {
                 onTap: onScan,
                 customBorder: const CircleBorder(),
                 child: Padding(
-                  padding: EdgeInsets.all(10 * band.scale),
+                  padding: EdgeInsets.all(8 * band.scale),
                   child: Icon(
                     Icons.qr_code_scanner_rounded,
-                    size: 22 * band.scale,
+                    size: 20 * band.scale,
                     color: BrandColors.goldGlow,
                   ),
                 ),
               ),
             ),
           ),
-      ],
-    );
-  }
-}
-
-/// Tablet-and-up trust badge beside the wordmark.
-class _SecurityBadge extends StatelessWidget {
-  const _SecurityBadge({required this.band});
-
-  final ScreenBand band;
-
-  @override
-  Widget build(BuildContext context) {
-    final labelStyle = Theme.of(context).textTheme.labelSmall;
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 14 * band.scale,
-        vertical: 8 * band.scale,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: BrandColors.gold.withValues(alpha: 0.6)),
-        color: BrandColors.gold.withValues(alpha: 0.10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.verified_user_outlined,
-            size: 16 * band.scale,
-            color: BrandColors.goldGlow,
-          ),
-          SizedBox(width: 8 * band.scale),
-          Text(
-            'آمن · مشفّر · موثّق',
-            maxLines: 1,
-            style: labelStyle?.copyWith(
-              color: BrandColors.goldGlow,
-              fontSize: (labelStyle.fontSize ?? 10) * band.scale,
-            ),
-          ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -225,8 +236,7 @@ class StepIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final band = Adaptive.bandOf(context);
-    // Labels only fit beside the nodes once there is real horizontal room.
-    final showLabels = MediaQuery.sizeOf(context).width >= 420;
+    final showLabels = MediaQuery.sizeOf(context).width >= 360;
 
     return Semantics(
       label: 'الخطوة ${currentStep + 1} من ${titles.length}',
@@ -271,7 +281,7 @@ class _StepNode extends StatelessWidget {
   Widget build(BuildContext context) {
     final done = index < current;
     final active = index == current;
-    final size = 32.0 * band.scale;
+    final size = 28.0 * band.scale;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -298,7 +308,7 @@ class _StepNode extends StatelessWidget {
                 ? [
                     BoxShadow(
                       color: BrandColors.gold.withValues(alpha: 0.5),
-                      blurRadius: 14,
+                      blurRadius: 12,
                       spreadRadius: 1,
                     ),
                   ]
@@ -324,7 +334,7 @@ class _StepNode extends StatelessWidget {
           ),
         ),
         if (showLabel) ...[
-          SizedBox(width: 10 * band.scale),
+          SizedBox(width: 8 * band.scale),
           Text(
             title,
             maxLines: 1,
@@ -338,7 +348,7 @@ class _StepNode extends StatelessWidget {
                       (Theme.of(context).textTheme.labelMedium?.fontSize ??
                               11) *
                           band.scale,
-                  letterSpacing: 0.4,
+                  letterSpacing: 0.3,
                 ),
           ),
         ],
@@ -356,11 +366,11 @@ class _Connector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8 * band.scale),
+      padding: EdgeInsets.symmetric(horizontal: 6 * band.scale),
       child: AnimatedContainer(
         duration: BrandDurations.standard,
         curve: Curves.easeOutCubic,
-        height: 2.4,
+        height: 2.2,
         decoration: BoxDecoration(
           gradient: active
               ? BrandGradients.gold

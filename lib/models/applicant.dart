@@ -23,28 +23,6 @@ enum AcademicYear {
   }
 }
 
-/// التخصص الدراسي / المجال الأكاديمي للمتقدّم.
-enum UndergraduateDegree {
-  engineering('هندسة وتكنولوجيا'),
-  medical('علوم طبية وصحية'),
-  business('اقتصاد وإدارة أعمال'),
-  law('حقوق وعلوم سياسية'),
-  arts('آداب وعلوم إنسانية'),
-  science('علوم أساسية'),
-  other('أخرى');
-
-  const UndergraduateDegree(this.label);
-  final String label;
-
-  static UndergraduateDegree? fromLabel(String? label) {
-    if (label == null) return null;
-    for (final degree in values) {
-      if (degree.label == label) return degree;
-    }
-    return null;
-  }
-}
-
 /// فصيلة الدم وفق نظام ABO / Rh.
 enum BloodType {
   aPositive('A+'),
@@ -81,11 +59,6 @@ enum VisualAcuity {
   twentySeventy('20/70'),
   twentyHundred('20/100'),
   twentyTwoHundred('20/200'),
-
-  /// أضعف من أعلى سطر في اللوحة — لم يُجتَز سطر 20/200 نفسه.
-  ///
-  /// تُلحَق آخر القائمة عن قصد: رمز QR يخزّن ترتيب القيمة لا نصّها، فإدراجها
-  /// في الوسط يُفسد كل بطاقة مطبوعة سابقًا.
   worseThanTwentyTwoHundred('أسوأ من 20/200');
 
   const VisualAcuity(this.label);
@@ -100,98 +73,99 @@ enum VisualAcuity {
   }
 }
 
-/// وسيلة تصحيح الإبصار المستخدمة أثناء الفحص.
-enum VisionCorrection {
-  none('بدون'),
-  glasses('نظارات'),
-  contacts('عدسات لاصقة');
-
-  const VisionCorrection(this.label);
-  final String label;
-
-  static VisionCorrection? fromLabel(String? label) {
-    if (label == null) return null;
-    for (final correction in values) {
-      if (correction.label == label) return correction;
-    }
-    return null;
-  }
-}
-
 /// البيانات الشخصية التي تُجمع أثناء التسجيل.
 @immutable
 class Applicant {
   const Applicant({
-    required this.firstName,
-    required this.lastName,
+    required this.fullName,
+    required this.birthYear,
     required this.academicYear,
-    required this.degree,
     required this.governorate,
-    required this.city,
-    this.customDegree,
     required this.heightCm,
     required this.weightKg,
     required this.bloodType,
     required this.rightEyeAcuity,
     required this.leftEyeAcuity,
-    required this.visionCorrection,
+    this.turnNumber = 'A-001',
+    this.hasBiometric = true,
     this.visionTest,
     this.photoPath,
   });
 
-  final String firstName;
-  final String lastName;
+  /// رقم الدور المحجوز (مثال: A-001).
+  final String turnNumber;
+
+  /// الاسم الثلاثي للمتقدّم.
+  final String fullName;
+
+  /// سنة الميلاد (مثال: 2001).
+  final int birthYear;
+
+  /// المرحلة الدراسية / المؤهل العلمي.
   final AcademicYear academicYear;
-  final UndergraduateDegree degree;
 
   /// المحافظة السورية التي يتبع لها المتقدّم.
   final String governorate;
-  final String city;
-  final String? customDegree;
+
+  /// الطول بالسنتيمتر.
   final int heightCm;
+
+  /// الوزن بالكيلوجرام.
   final double weightKg;
+
+  /// فصيلة الدم.
   final BloodType bloodType;
+
+  /// حدة إبصار العين اليمنى.
   final VisualAcuity rightEyeAcuity;
+
+  /// حدة إبصار العين اليسرى.
   final VisualAcuity leftEyeAcuity;
-  final VisionCorrection visionCorrection;
+
+  /// هل تم التحقق من بصمة الإصبع بيومترياً.
+  final bool hasBiometric;
 
   /// تفاصيل فحص النظر التفاعلي عند إجرائه داخل التطبيق.
   final VisionTestReport? visionTest;
+
+  /// مسار الصورة الشخصية محلياً.
   final String? photoPath;
 
-  /// نسخة معدّلة — تُستخدم مثلًا لإرفاق الصورة المحفوظة محليًا ببطاقة
-  /// أُعيد بناؤها من رمز QR.
-  Applicant copyWith({String? photoPath, VisionTestReport? visionTest}) {
+  /// نسخة معدّلة.
+  Applicant copyWith({
+    String? fullName,
+    int? birthYear,
+    AcademicYear? academicYear,
+    String? governorate,
+    int? heightCm,
+    double? weightKg,
+    BloodType? bloodType,
+    VisualAcuity? rightEyeAcuity,
+    VisualAcuity? leftEyeAcuity,
+    String? turnNumber,
+    bool? hasBiometric,
+    String? photoPath,
+    VisionTestReport? visionTest,
+  }) {
     return Applicant(
-      firstName: firstName,
-      lastName: lastName,
-      academicYear: academicYear,
-      degree: degree,
-      customDegree: customDegree,
-      governorate: governorate,
-      city: city,
-      heightCm: heightCm,
-      weightKg: weightKg,
-      bloodType: bloodType,
-      rightEyeAcuity: rightEyeAcuity,
-      leftEyeAcuity: leftEyeAcuity,
-      visionCorrection: visionCorrection,
+      fullName: fullName ?? this.fullName,
+      birthYear: birthYear ?? this.birthYear,
+      academicYear: academicYear ?? this.academicYear,
+      governorate: governorate ?? this.governorate,
+      heightCm: heightCm ?? this.heightCm,
+      weightKg: weightKg ?? this.weightKg,
+      bloodType: bloodType ?? this.bloodType,
+      rightEyeAcuity: rightEyeAcuity ?? this.rightEyeAcuity,
+      leftEyeAcuity: leftEyeAcuity ?? this.leftEyeAcuity,
+      turnNumber: turnNumber ?? this.turnNumber,
+      hasBiometric: hasBiometric ?? this.hasBiometric,
       visionTest: visionTest ?? this.visionTest,
       photoPath: photoPath ?? this.photoPath,
     );
   }
 
-  String get fullName => '$firstName $lastName'.trim();
-
-  String get degreeLabel => degree == UndergraduateDegree.other
-      ? (customDegree?.trim().isNotEmpty == true
-          ? customDegree!.trim()
-          : degree.label)
-      : degree.label;
-
-  /// العنوان المختصر كما يظهر على البطاقة: «دوما، ريف دمشق».
-  String get placeLabel =>
-      city == governorate ? governorate : '$city، $governorate';
+  /// العنوان كما يظهر على البطاقة.
+  String get placeLabel => governorate;
 
   bool get hasPhoto => photoPath != null && photoPath!.isNotEmpty;
 
@@ -199,7 +173,7 @@ class Applicant {
   String get visionSourceLabel =>
       visionTest?.methodLabel ?? 'إدخال يدوي من تقرير سابق';
 
-  /// النسخة المختصرة من المصدر، لظهر البطاقة حيث المساحة ضيقة.
+  /// النسخة المختصرة من المصدر، لظهر البطاقة.
   String get visionSourceShortLabel =>
       visionTest?.shortMethodLabel ?? 'إدخال يدوي';
 }

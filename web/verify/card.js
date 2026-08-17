@@ -66,7 +66,7 @@ export function drawSheet(canvas, card, scale = 3) {
   ctx.font = '400 12px Almarai, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(
-    'الهوية الرقمية · وثيقة صادرة رقميًا وقابلة للتحقق',
+    'إدارة القوى البشرية · وثيقة هوية رقمية معتمدة وموثقة بيومترياً',
     SHEET_WIDTH / 2,
     SHEET_HEIGHT - MARGIN + 6,
   );
@@ -111,19 +111,28 @@ function drawFront(ctx, card, x, y, w, h) {
   ctx.restore();
 
   // Header row: logo, wordmark, verified chip.
-  const logoSize = w * 0.075;
+  const logoSize = w * 0.082;
   const headerY = y + pad;
   drawLogo(ctx, x + w - pad - logoSize, headerY, logoSize);
 
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = `700 ${w * 0.028}px Almarai, sans-serif`;
+  ctx.font = `800 ${w * 0.029}px Almarai, sans-serif`;
   ctx.textAlign = 'right';
   ctx.fillText(
-    'الهوية الرقمية',
+    'إدارة القوى البشرية',
     x + w - pad - logoSize - w * 0.022,
-    headerY + logoSize * 0.68,
+    headerY + logoSize * 0.48,
   );
-  drawChip(ctx, x + pad, headerY, w, 'موثّقة');
+
+  ctx.fillStyle = GOLD_GLOW;
+  ctx.font = `700 ${w * 0.018}px Almarai, sans-serif`;
+  ctx.fillText(
+    'رحلة حياة المنتسب · الهوية الرقمية',
+    x + w - pad - logoSize - w * 0.022,
+    headerY + logoSize * 0.88,
+  );
+
+  drawChip(ctx, x + pad, headerY, w, card.hasBiometric ? 'بصمة موثقة' : 'موثّقة');
 
   // Portrait frame.
   const photoW = w * 0.22;
@@ -146,22 +155,23 @@ function drawFront(ctx, card, x, y, w, h) {
   const textRight = photoX - w * 0.04;
   ctx.textAlign = 'right';
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = `700 ${w * 0.048}px Almarai, sans-serif`;
-  ctx.fillText(card.fullName, textRight, photoY + photoH * 0.62);
+  ctx.font = `800 ${w * 0.046}px Almarai, sans-serif`;
+  ctx.fillText(card.fullName, textRight, photoY + photoH * 0.58);
 
   ctx.fillStyle = GOLD_GLOW;
-  ctx.font = `400 ${w * 0.021}px Almarai, sans-serif`;
+  ctx.font = `700 ${w * 0.022}px Almarai, sans-serif`;
   ctx.fillText(
-    `${card.academicYear}  ·  ${card.degree}`,
+    `${card.academicYear}  ·  مواليد ${card.birthYear}`,
     textRight,
-    photoY + photoH * 0.62 + w * 0.038,
+    photoY + photoH * 0.58 + w * 0.038,
   );
 
-  ctx.fillStyle = 'rgba(255,255,255,0.72)';
+  ctx.fillStyle = 'rgba(255,255,255,0.78)';
+  ctx.font = `400 ${w * 0.021}px Almarai, sans-serif`;
   ctx.fillText(
-    card.placeLabel,
+    `محافظة ${card.governorate}`,
     textRight,
-    photoY + photoH * 0.62 + w * 0.068,
+    photoY + photoH * 0.58 + w * 0.072,
   );
 
   // Footer: divider, captions, personal ID.
@@ -215,8 +225,7 @@ function drawBack(ctx, card, x, y, w, h) {
   roundedRect(ctx, x, y, w, h, radius);
   ctx.stroke();
 
-  // QR block on the leading (right in RTL is the text side) — the app puts it
-  // on the left of the details, so mirror that here.
+  // QR block on the leading (right in RTL is the text side)
   const qrBoxW = w * 0.285;
   const qrBoxX = x + pad;
   const qrPad = w * 0.02;
@@ -238,7 +247,7 @@ function drawBack(ctx, card, x, y, w, h) {
   ctx.font = `700 ${w * 0.014}px Almarai, sans-serif`;
   ctx.textAlign = 'center';
   ctx.fillText(
-    'امسح للتحقق',
+    'امسح للتحقق الفوري',
     qrBoxX + qrBoxW / 2,
     qrBoxY + qrPad + qrSize + w * 0.025,
   );
@@ -249,8 +258,8 @@ function drawBack(ctx, card, x, y, w, h) {
 
   ctx.textAlign = 'right';
   ctx.fillStyle = PINE;
-  ctx.font = `700 ${w * 0.024}px Almarai, sans-serif`;
-  ctx.fillText('بيانات الهوية', colRight, y + pad + w * 0.03);
+  ctx.font = `800 ${w * 0.026}px Almarai, sans-serif`;
+  ctx.fillText('بيانات الهوية الرقمية', colRight, y + pad + w * 0.03);
 
   ctx.fillStyle = GOLD_DEEP;
   ctx.font = `700 ${w * 0.019}px SpaceMono, monospace`;
@@ -261,11 +270,11 @@ function drawBack(ctx, card, x, y, w, h) {
 
   const items = [
     ['فصيلة الدم', card.bloodType],
+    ['سنة الميلاد', `${card.birthYear}`],
+    ['المحافظة', card.governorate],
     ['الطول', `${card.heightCm} سم`],
     ['الوزن', formatWeight(card.weightKg)],
-    ['العين اليمنى', card.rightEye],
-    ['العين اليسرى', card.leftEye],
-    ['التصحيح', card.correction],
+    ['البصمة البيومترية', card.biometricLabel],
   ];
   const cellW = colWidth / 3;
   const gridTop = y + h * 0.42;
@@ -292,10 +301,14 @@ function drawBack(ctx, card, x, y, w, h) {
   ctx.fillStyle = 'rgba(185,167,121,0.4)';
   ctx.fillRect(colRight - colWidth, footerY - w * 0.03, colWidth, 1);
 
-  ctx.font = `400 ${w * 0.0155}px Almarai, sans-serif`;
-  ctx.fillStyle = INK_MUTED;
+  ctx.font = `700 ${w * 0.016}px Almarai, sans-serif`;
+  ctx.fillStyle = INK;
   ctx.textAlign = 'right';
-  ctx.fillText(card.visionSource, colRight, footerY);
+  const acuityLabel = card.rightEye === card.leftEye
+      ? `حدة الإبصار: ${card.rightEye}`
+      : `حدة الإبصار: يمنى ${card.rightEye} · يسرى ${card.leftEye}`;
+  ctx.fillText(acuityLabel, colRight, footerY);
+
   ctx.fillStyle = GOLD_DEEP;
   ctx.textAlign = 'left';
   ctx.fillText(card.issuedAtLabel, colRight - colWidth, footerY);
@@ -389,106 +402,109 @@ export function canvasToPngBlob(canvas) {
 }
 
 /// Builds a one-page A4 PDF containing the rendered sheet.
-///
-/// Written by hand rather than with a library: the page has no dependencies,
-/// and a PDF that wraps a single Flate-compressed image needs only a handful
-/// of objects.
 export async function canvasToPdfBlob(canvas, title) {
   const { width, height } = canvas;
   const ctx = canvas.getContext('2d');
   const { data } = ctx.getImageData(0, 0, width, height);
 
-  // Drop alpha onto the ivory background — PDF images here are opaque RGB.
   const rgb = new Uint8Array(width * height * 3);
   for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
-    const alpha = data[i + 3] / 255;
-    rgb[j] = Math.round(data[i] * alpha + 255 * (1 - alpha));
-    rgb[j + 1] = Math.round(data[i + 1] * alpha + 255 * (1 - alpha));
-    rgb[j + 2] = Math.round(data[i + 2] * alpha + 255 * (1 - alpha));
+    rgb[j] = data[i];
+    rgb[j + 1] = data[i + 1];
+    rgb[j + 2] = data[i + 2];
   }
 
-  const compressed = await deflate(rgb);
+  const compressed = await gzipBytes(rgb);
 
-  const A4 = { w: 595.28, h: 841.89 };
-  const margin = 36;
-  const scale = Math.min(
-    (A4.w - margin * 2) / width,
-    (A4.h - margin * 2) / height,
-  );
-  const drawW = width * scale;
-  const drawH = height * scale;
-  const offsetX = (A4.w - drawW) / 2;
-  const offsetY = (A4.h - drawH) / 2;
+  const a4W = 595.28;
+  const a4H = 841.89;
+  const margin = 40;
+  const targetW = a4W - margin * 2;
+  const targetH = (targetW / width) * height;
+  const targetX = margin;
+  const targetY = (a4H - targetH) / 2;
 
-  const encoder = new TextEncoder();
-  const chunks = [];
-  const offsets = [0];
-  let length = 0;
+  const contentStream =
+    `q\n` +
+    `${targetW.toFixed(2)} 0 0 ${targetH.toFixed(2)} ${targetX.toFixed(2)} ${targetY.toFixed(2)} cm\n` +
+    `/Im0 Do\n` +
+    `Q\n`;
 
-  const push = (bytes) => {
-    chunks.push(bytes);
-    length += bytes.length;
+  const objects = [];
+  const add = (str, streamBytes) => {
+    const num = objects.length + 1;
+    objects.push({ num, body: str, streamBytes });
+    return num;
   };
-  const pushText = (text) => push(encoder.encode(text));
-  const startObject = () => offsets.push(length);
 
-  pushText('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
-
-  startObject();
-  pushText('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
-
-  startObject();
-  pushText('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
-
-  startObject();
-  pushText(
-    `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4.w} ${A4.h}] ` +
-      '/Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n',
+  const catalogId = add(`<< /Type /Catalog /Pages 2 0 R >>`);
+  const pagesId = add(`<< /Type /Pages /Kids [3 0 R] /Count 1 >>`);
+  const contentId = add(
+    `<< /Length ${contentStream.length} >>\nstream\n${contentStream}endstream`,
   );
-
-  startObject();
-  pushText(
-    `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${width} ` +
-      `/Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 ` +
-      `/Filter /FlateDecode /Length ${compressed.length} >>\nstream\n`,
+  const imageId = add(
+    `<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} ` +
+      `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode ` +
+      `/Length ${compressed.length} >>\nstream\n`,
+    compressed,
   );
-  push(compressed);
-  pushText('\nendstream\nendobj\n');
+  const pageId = 3;
+  objects[2] = {
+    num: 3,
+    body:
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${a4W} ${a4H}] ` +
+      `/Contents ${contentId} 0 R ` +
+      `/Resources << /XObject << /Im0 ${imageId} 0 R >> >> >>`,
+  };
 
-  const content =
-    `q\n${drawW.toFixed(2)} 0 0 ${drawH.toFixed(2)} ` +
-    `${offsetX.toFixed(2)} ${offsetY.toFixed(2)} cm\n/Im0 Do\nQ\n`;
-  startObject();
-  pushText(
-    `5 0 obj\n<< /Length ${content.length} >>\nstream\n${content}endstream\nendobj\n`,
-  );
+  let offset = 0;
+  const chunks = ['%PDF-1.4\n%\xFF\xFF\xFF\xFF\n'];
+  offset = byteLength(chunks[0]);
 
-  startObject();
-  pushText(
-    `6 0 obj\n<< /Title (${pdfText(title)}) /Producer (A Digital Identity) >>\nendobj\n`,
-  );
+  const xref = [0];
+  for (const obj of objects) {
+    xref.push(offset);
+    let head = `${obj.num} 0 obj\n${obj.body}\n`;
+    if (obj.streamBytes) {
+      head += '';
+    } else if (!obj.body.endsWith('endstream')) {
+      head += 'endobj\n';
+    }
+    chunks.push(head);
+    offset += byteLength(head);
 
-  const xrefStart = length;
-  let xref = `xref\n0 ${offsets.length}\n0000000000 65535 f \n`;
-  for (let i = 1; i < offsets.length; i++) {
-    xref += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+    if (obj.streamBytes) {
+      chunks.push(obj.streamBytes);
+      offset += obj.streamBytes.length;
+      const tail = '\nendstream\nendobj\n';
+      chunks.push(tail);
+      offset += byteLength(tail);
+    }
   }
-  xref +=
-    `trailer\n<< /Size ${offsets.length} /Root 1 0 R /Info 6 0 R >>\n` +
-    `startxref\n${xrefStart}\n%%EOF\n`;
-  pushText(xref);
+
+  const startXref = offset;
+  let xrefStr = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i < xref.length; i++) {
+    xrefStr += `${xref[i].toString().padStart(10, '0')} 00000 n \n`;
+  }
+  xrefStr +=
+    `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\n` +
+    `startxref\n${startXref}\n%%EOF\n`;
+  chunks.push(xrefStr);
 
   return new Blob(chunks, { type: 'application/pdf' });
 }
 
-async function deflate(bytes) {
-  const stream = new Blob([bytes]).stream().pipeThrough(
-    new CompressionStream('deflate'),
-  );
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+function byteLength(str) {
+  return new TextEncoder().encode(str).length;
 }
 
-/// Escapes a string for a PDF literal, keeping it to ASCII.
-function pdfText(text) {
-  return text.replace(/[\\()]/g, (c) => `\\${c}`).replace(/[^\x20-\x7E]/g, '');
+async function gzipBytes(bytes) {
+  if (typeof CompressionStream !== 'undefined') {
+    const cs = new CompressionStream('deflate');
+    const stream = new Response(new Blob([bytes])).body.pipeThrough(cs);
+    const ab = await new Response(stream).arrayBuffer();
+    return new Uint8Array(ab);
+  }
+  return bytes;
 }

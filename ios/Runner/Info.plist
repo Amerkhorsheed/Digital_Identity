@@ -20,6 +20,8 @@
 	<string>Your photo is captured locally and used only on your identity card.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose a portrait from your library for your identity card.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>تُستخدم البصمة البيومترية للتحقق من هوية حامل البطاقة وتوثيقها بأمان.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

@@ -7,18 +7,16 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 const _applicant = Applicant(
-  firstName: 'Sara',
-  lastName: 'Almaziad',
+  fullName: 'Sara Almaziad',
+  birthYear: 2001,
   academicYear: AcademicYear.bachelor,
-  degree: UndergraduateDegree.engineering,
   governorate: 'دمشق',
-  city: 'المزة',
   heightCm: 165,
   weightKg: 58.5,
   bloodType: BloodType.oPositive,
   rightEyeAcuity: VisualAcuity.twentyTwenty,
   leftEyeAcuity: VisualAcuity.twentyTwentyFive,
-  visionCorrection: VisionCorrection.none,
+  hasBiometric: true,
 );
 
 final _issuedAt = DateTime.utc(2026, 8, 16, 9, 30);
@@ -41,7 +39,7 @@ void main() {
     final file = await ExportService.exportPdf(
       applicant: _applicant,
       personalId: 'A-260816-TEST12',
-        issuedAt: _issuedAt,
+      issuedAt: _issuedAt,
     );
 
     expect(file.existsSync(), isTrue);
@@ -54,7 +52,7 @@ void main() {
     final file = await ExportService.exportPng(
       applicant: _applicant,
       personalId: 'A-260816-TEST12',
-        issuedAt: _issuedAt,
+      issuedAt: _issuedAt,
     );
 
     expect(file.existsSync(), isTrue);
