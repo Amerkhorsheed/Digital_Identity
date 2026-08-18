@@ -9,6 +9,10 @@ import '../../../shared/widgets/brand_widgets.dart';
 ///
 /// Carries the logo/emblem, the wordmark, the current turn ticket badge (e.g. A-001),
 /// and the live step indicator so the user always knows where they are in the journey.
+///
+/// It holds no controls. The header is a place marker, and every action that
+/// used to sit up here — drawing a new turn, opening the scanner — belongs to a
+/// screen that can explain it.
 class FlowHeader extends StatelessWidget {
   const FlowHeader({
     super.key,
@@ -16,18 +20,12 @@ class FlowHeader extends StatelessWidget {
     required this.totalSteps,
     required this.stepTitles,
     this.turnNumber = 'A-001',
-    this.onResetTurn,
-    this.onScan,
   });
 
   final int currentStep;
   final int totalSteps;
   final List<String> stepTitles;
   final String turnNumber;
-  final VoidCallback? onResetTurn;
-
-  /// Opens the card scanner. Hidden when null.
-  final VoidCallback? onScan;
 
   @override
   Widget build(BuildContext context) {
@@ -68,12 +66,7 @@ class FlowHeader extends StatelessWidget {
                       horizontal: band.gutter,
                       vertical: vertical,
                     ),
-                    child: _BrandRow(
-                      band: band,
-                      turnNumber: turnNumber,
-                      onResetTurn: onResetTurn,
-                      onScan: onScan,
-                    ),
+                    child: _BrandRow(band: band, turnNumber: turnNumber),
                   ),
                 Container(
                   height: 1,
@@ -100,17 +93,10 @@ class FlowHeader extends StatelessWidget {
 }
 
 class _BrandRow extends StatelessWidget {
-  const _BrandRow({
-    required this.band,
-    required this.turnNumber,
-    this.onResetTurn,
-    this.onScan,
-  });
+  const _BrandRow({required this.band, required this.turnNumber});
 
   final ScreenBand band;
   final String turnNumber;
-  final VoidCallback? onResetTurn;
-  final VoidCallback? onScan;
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +119,8 @@ class _BrandRow extends StatelessWidget {
                 style: textTheme.titleMedium?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
-                  fontSize: (textTheme.titleMedium?.fontSize ?? 15) * band.scale,
+                  fontSize:
+                      (textTheme.titleMedium?.fontSize ?? 15) * band.scale,
                 ),
               ),
               Text(
@@ -173,50 +160,6 @@ class _BrandRow extends StatelessWidget {
             ),
           ),
         ),
-        if (onResetTurn != null) ...[
-          SizedBox(width: 6 * band.scale),
-          Tooltip(
-            message: 'سحب دور جديد',
-            child: Material(
-              color: Colors.transparent,
-              shape: const CircleBorder(),
-              child: InkWell(
-                onTap: onResetTurn,
-                customBorder: const CircleBorder(),
-                child: Padding(
-                  padding: EdgeInsets.all(6 * band.scale),
-                  child: Icon(
-                    Icons.refresh_rounded,
-                    size: 20 * band.scale,
-                    color: Colors.white70,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-        if (onScan != null) ...[
-          SizedBox(width: 6 * band.scale),
-          Tooltip(
-            message: 'مسح بطاقة',
-            child: Material(
-              color: BrandColors.gold.withValues(alpha: 0.14),
-              shape: const CircleBorder(),
-              child: InkWell(
-                onTap: onScan,
-                customBorder: const CircleBorder(),
-                child: Padding(
-                  padding: EdgeInsets.all(8 * band.scale),
-                  child: Icon(
-                    Icons.qr_code_scanner_rounded,
-                    size: 20 * band.scale,
-                    color: BrandColors.goldGlow,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -236,30 +179,70 @@ class StepIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final band = Adaptive.bandOf(context);
-    final showLabels = MediaQuery.sizeOf(context).width >= 360;
 
     return Semantics(
       label: 'الخطوة ${currentStep + 1} من ${titles.length}',
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          for (var i = 0; i < titles.length; i++) ...[
-            _StepNode(
-              index: i,
-              title: titles[i],
-              current: currentStep,
-              showLabel: showLabels,
-              band: band,
-            ),
-            if (i != titles.length - 1)
-              Expanded(
-                child: _Connector(active: i < currentStep, band: band),
-              ),
-          ],
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Whether the names fit is a question about these particular words at
+          // this particular size, so it is measured rather than guessed from a
+          // width threshold. When they do not fit the trail runs on numbers
+          // alone — the step hero directly below already names the step.
+          final showLabels = _labelsFit(context, band, constraints.maxWidth);
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (var i = 0; i < titles.length; i++) ...[
+                _StepNode(
+                  index: i,
+                  title: titles[i],
+                  current: currentStep,
+                  showLabel: showLabels,
+                  band: band,
+                ),
+                if (i != titles.length - 1)
+                  Expanded(
+                    child: _Connector(active: i < currentStep, band: band),
+                  ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
+
+  /// Lays out every title at the widest weight the trail uses and adds the
+  /// nodes, gaps and connector padding, so the answer holds for the active step
+  /// as well as the inactive ones.
+  bool _labelsFit(BuildContext context, ScreenBand band, double available) {
+    if (!available.isFinite) return true;
+
+    final base = Theme.of(context).textTheme.labelMedium;
+    final style = base?.copyWith(
+      fontWeight: FontWeight.w700,
+      fontSize: (base.fontSize ?? 11) * band.scale,
+      letterSpacing: 0.3,
+    );
+
+    var needed =
+        titles.length * 28.0 * band.scale +
+        (titles.length - 1) * (12.0 * band.scale + _connectorMinimum);
+    for (final title in titles) {
+      final painter = TextPainter(
+        text: TextSpan(text: title, style: style),
+        textDirection: Directionality.of(context),
+        maxLines: 1,
+      )..layout();
+      needed += painter.width + 8 * band.scale;
+    }
+    return needed <= available;
+  }
+
+  /// The shortest a connector can be drawn and still read as a link rather
+  /// than a speck between two nodes.
+  static const double _connectorMinimum = 16;
 }
 
 class _StepNode extends StatelessWidget {
@@ -324,32 +307,33 @@ class _StepNode extends StatelessWidget {
                 : Text(
                     '${index + 1}',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: active
-                              ? const Color(0xFF243028)
-                              : BrandColors.goldGlow,
-                          fontWeight: FontWeight.w700,
-                          fontSize: size * 0.42,
-                        ),
+                      color: active
+                          ? const Color(0xFF243028)
+                          : BrandColors.goldGlow,
+                      fontWeight: FontWeight.w700,
+                      fontSize: size * 0.42,
+                    ),
                   ),
           ),
         ),
         if (showLabel) ...[
           SizedBox(width: 8 * band.scale),
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: active
-                      ? Colors.white
-                      : Colors.white.withValues(alpha: done ? 0.85 : 0.5),
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                  fontSize:
-                      (Theme.of(context).textTheme.labelMedium?.fontSize ??
-                              11) *
-                          band.scale,
-                  letterSpacing: 0.3,
-                ),
+          Flexible(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: active
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: done ? 0.85 : 0.5),
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                fontSize:
+                    (Theme.of(context).textTheme.labelMedium?.fontSize ?? 11) *
+                    band.scale,
+                letterSpacing: 0.3,
+              ),
+            ),
           ),
         ],
       ],

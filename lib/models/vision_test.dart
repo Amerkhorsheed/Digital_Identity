@@ -162,7 +162,7 @@ class EyeResult {
   double get accuracy => totalAnswers == 0 ? 0 : correctAnswers / totalAnswers;
 }
 
-/// تقرير فحص النظر الكامل، يُضمّن في بطاقة الهوية ورمز QR.
+/// تقرير فحص النظر الكامل، يُضمّن في البطاقة ورمز QR.
 @immutable
 class VisionTestReport {
   const VisionTestReport({

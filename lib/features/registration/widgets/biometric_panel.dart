@@ -353,7 +353,7 @@ class _SensorShortcut extends StatelessWidget {
 }
 
 
-/// ملخّص المطابقة المعتمَدة: الوسيلة، المستشعر، الوقت، وبصمة التدقيق.
+/// ملخّص المطابقة المعتمَدة: الوسيلة، والمستشعر، ووقت المطابقة.
 class _CaptureSummary extends StatelessWidget {
   const _CaptureSummary({required this.capture, required this.onReset});
 
@@ -401,35 +401,6 @@ class _CaptureSummary extends StatelessWidget {
               ],
             ),
           ),
-        if (capture.shortAttestation != null) ...[
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.28),
-              borderRadius: BorderRadius.circular(BrandRadii.small),
-              border: Border.all(color: BrandColors.goldDeep),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.tag_rounded,
-                    size: 15, color: BrandColors.goldGlow),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'إثبات المطابقة · ${capture.shortAttestation}',
-                    style: const TextStyle(
-                      color: BrandColors.goldGlow,
-                      fontFamily: 'SpaceMono',
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
         const SizedBox(height: 6),
         Align(
           alignment: AlignmentDirectional.centerStart,

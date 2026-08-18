@@ -412,7 +412,7 @@ class _CardSpread extends StatelessWidget {
     return Center(
       child: Semantics(
         button: true,
-        label: 'بطاقة الهوية — الوجه الأمامي والخلفي، اضغط لتكبير رمز التحقق',
+        label: 'البطاقة — الوجه الأمامي والخلفي، اضغط لتكبير رمز التحقق',
         child: GestureDetector(
           onTap: onTap,
           behavior: HitTestBehavior.opaque,

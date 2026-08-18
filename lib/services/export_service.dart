@@ -98,7 +98,7 @@ abstract final class ExportService {
     required DateTime issuedAt,
   }) async {
     final document = pw.Document(
-      title: 'شهادة هوية المنتسب — $personalId',
+      title: 'شهادة المنتسب — $personalId',
       author: 'إدارة القوى البشرية',
     );
     final palette = await _PdfPalette.create(
@@ -271,7 +271,7 @@ abstract final class ExportService {
                   ),
                 ),
                 pw.Text(
-                  'شهادة هوية رسمية',
+                  'شهادة رسمية',
                   style: pw.TextStyle(
                     color: p.gold,
                     fontSize: 10,
@@ -531,7 +531,7 @@ abstract final class ExportService {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(
-                  'بيانات الهوية',
+                  'بيانات المنتسب',
                   style: pw.TextStyle(
                     color: p.ink,
                     fontSize: 13,

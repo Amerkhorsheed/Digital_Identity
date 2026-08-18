@@ -68,7 +68,7 @@ class _ScanCardPageState extends State<ScanCardPage> {
         _handling = false;
         _error = CardLink.looksLikeCard(raw)
             ? 'الرمز تالف أو غير مكتمل. حاول مسحه مرة أخرى.'
-            : 'هذا ليس رمز بطاقة هوية رقمية.';
+            : 'هذا ليس رمز بطاقة رقمية.';
       });
       await HapticFeedback.heavyImpact();
       return;

@@ -11,11 +11,11 @@ import '../../shared/widgets/adaptive_layout.dart';
 import '../../shared/widgets/brand_widgets.dart';
 import '../../shared/widgets/ornament_background.dart';
 import '../idcard/id_result_page.dart';
-import '../verify/scan_card_page.dart';
 import 'steps/health_step.dart';
 import 'steps/identity_step.dart';
 import 'steps/photo_step.dart';
 import 'steps/turn_step.dart';
+import 'steps/vision_step.dart';
 import 'widgets/flow_header.dart';
 
 /// Mutable draft of the applicant being registered. Each step edits the draft
@@ -40,11 +40,12 @@ class ApplicantDraft {
   bool get hasBiometric => biometric != null;
 }
 
-/// The four-step registration journey:
+/// The five-step registration journey:
 /// 1. Reception & Turn reservation (الاستقبال / قطع الدور)
-/// 2. Identity details (البيانات)
-/// 3. Health measurements & Eye test (الصحة)
-/// 4. Portrait & Biometric fingerprint (البصمة)
+/// 2. Personal details (البيانات)
+/// 3. Health measurements & blood group (الصحة)
+/// 4. Sight check (النظر)
+/// 5. Portrait & fingerprint (البصمة)
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({
     super.key,
@@ -62,8 +63,14 @@ class RegistrationPage extends StatefulWidget {
 }
 
 class _RegistrationPageState extends State<RegistrationPage> {
-  static const int _stepCount = 4;
-  static const List<String> _stepTitles = ['الاستقبال', 'البيانات', 'الصحة', 'البصمة'];
+  static const int _stepCount = 5;
+  static const List<String> _stepTitles = [
+    'الاستقبال',
+    'البيانات',
+    'الصحة',
+    'النظر',
+    'البصمة',
+  ];
 
   PageController _pageController = PageController();
   ApplicantDraft _draft = ApplicantDraft();
@@ -85,13 +92,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
   void _refresh() {
     if (mounted) setState(() {});
-  }
-
-  void _resetTurn() {
-    _turnSequence = _turnSequence >= 999 ? 1 : _turnSequence + 1;
-    setState(() {
-      _draft.turnNumber = 'A-${_turnSequence.toString().padLeft(3, '0')}';
-    });
   }
 
   /// Clears the whole journey, advances to the next turn number, and returns to step zero.
@@ -130,9 +130,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 totalSteps: _stepCount,
                 stepTitles: _stepTitles,
                 turnNumber: _draft.turnNumber,
-                onResetTurn: _resetTurn,
-                onScan: () =>
-                    ScanCardPage.open(context, store: widget.store),
               ),
               Expanded(
                 child: PageView(
@@ -159,9 +156,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       errors: _visibleErrors(2),
                       onChanged: _refresh,
                     ),
-                    PhotoStep(
+                    VisionStep(
                       draft: _draft,
                       errors: _visibleErrors(3),
+                      onChanged: _refresh,
+                    ),
+                    PhotoStep(
+                      draft: _draft,
+                      errors: _visibleErrors(4),
                       onChanged: _refresh,
                       biometricService: widget.biometricService,
                     ),
@@ -232,12 +234,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
         if (draft.bloodType == null) {
           errors['bloodType'] = 'مطلوب';
         }
-        if (draft.rightEyeAcuity == null || draft.leftEyeAcuity == null) {
-          errors['vision'] = 'أجرِ فحص النظر أو أدخل نتيجة تقريرك الطبي';
-        }
       case 3:
+        if (draft.rightEyeAcuity == null || draft.leftEyeAcuity == null) {
+          errors['vision'] = 'أجرِ فحص النظر للمتابعة';
+        }
+      case 4:
         if (!draft.hasPhoto) {
-          errors['photo'] = 'الصورة مطلوبة لإصدار بطاقة الهوية';
+          errors['photo'] = 'الصورة مطلوبة لإصدار البطاقة';
         }
         if (!draft.hasBiometric) {
           errors['biometric'] =
@@ -407,7 +410,7 @@ class _ActionBar extends StatelessWidget {
                 child: Tooltip(
                   message: blockedReason ?? '',
                   child: BrandButton(
-                    label: isLast ? 'إصدار بطاقة الهوية' : 'متابعة',
+                    label: isLast ? 'إصدار بطاقة' : 'متابعة',
                     icon: isLast
                         ? Icons.card_membership_rounded
                         : Icons.arrow_forward_rounded,

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:a_digital_id/app/app.dart';
 import 'package:a_digital_id/features/idcard/id_result_page.dart';
+import 'package:a_digital_id/models/applicant.dart';
 import 'package:a_digital_id/features/registration/widgets/fingerprint_pad.dart';
 import 'package:a_digital_id/services/biometric_service.dart';
 import 'package:a_digital_id/services/id_record_store.dart';
@@ -145,13 +146,15 @@ void main() {
     await _tapText(tester, 'متابعة');
 
     // Step 2 — Health
-    await _selectDropdown(tester, 'فصيلة الدم', 'O+');
-    await _tapText(tester, 'لديّ تقرير طبي جاهز (إدخال يدوي)');
-    await _selectDropdown(tester, 'العين اليمنى — حدة الإبصار', '20/20');
-    await _selectDropdown(tester, 'العين اليسرى — حدة الإبصار', '20/30');
+    await tester.tap(find.byKey(const ValueKey(BloodType.oPositive)));
+    await tester.pumpAndSettle();
     await _tapText(tester, 'متابعة');
 
-    // Step 3 — Photo & Biometric
+    // Step 3 — the sight check, on its own page
+    await _runEyeTest(tester);
+    await _tapText(tester, 'متابعة');
+
+    // Step 4 — Photo & fingerprint
     await _tapText(tester, 'التقاط صورة');
     expect(find.text('تم التقاط الصورة — تبدو رائعة ومكتملة!'), findsOneWidget);
 
@@ -161,9 +164,9 @@ void main() {
     expect(find.text('مُلتقطة'), findsOneWidget);
     expect(find.text('التقاط بصمة — لوحة اللمس'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('إصدار بطاقة الهوية'));
+    await tester.ensureVisible(find.text('إصدار بطاقة'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('إصدار بطاقة الهوية'));
+    await tester.tap(find.text('إصدار بطاقة'));
     await tester.pump();
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 400)),
@@ -186,4 +189,26 @@ void main() {
     expect(find.text('A-002'), findsWidgets);
     expect(find.text('التالي'), findsOneWidget);
   });
+}
+
+/// Runs the interactive sight check end to end and accepts its result.
+Future<void> _runEyeTest(WidgetTester tester) async {
+  await tester.tap(find.text('ابدأ الفحص الآن'));
+  await tester.pumpAndSettle();
+
+  await tester.tap(find.text('بدء الفحص السريع الآن'));
+  await tester.pumpAndSettle();
+
+  for (var i = 0; i < 5; i++) {
+    await tester.tap(find.text('أعلى'));
+    await tester.pumpAndSettle();
+  }
+
+  await tester.tap(find.text('اعتماد النتيجة والمتابعة'));
+  await tester.pumpAndSettle();
+
+  // The confirmation bar floats over the action bar on its way out; waiting it
+  // out keeps the next tap on the button rather than on the snack.
+  await tester.pump(const Duration(seconds: 2));
+  await tester.pumpAndSettle();
 }

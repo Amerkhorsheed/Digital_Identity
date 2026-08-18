@@ -142,7 +142,7 @@ class _SplashPageState extends State<SplashPage>
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'تسجيل آمن · هوية موثّقة · بطاقة فورية',
+                              'تسجيل آمن · بيانات موثّقة · بطاقة فورية',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     color: BrandColors.goldGlow,
                                   ),

@@ -39,18 +39,89 @@
         --outline: #eae4d5;
         --error: #b3261e;
         --success: #2e7d5b;
+
+        /* Lattice tile — max(100vw, 100vh) / 7, as the app computes it. */
+        --tile: calc(max(100vw, 100vh) / 7);
       }
 
       * { box-sizing: border-box; }
 
+      /* ------------------------------------------------- الخلفية الزخرفية
+         The same backdrop the app paints behind every screen: a fine 8-point
+         star lattice with a gold and a pine glow over it, and the corner
+         brackets from the splash. The lattice is one tile of the motif,
+         repeated at max(100vw, 100vh) / 7 — the same tile size the app
+         computes — so the two surfaces read as one product.                */
       body {
         margin: 0;
         min-height: 100dvh;
-        background: var(--ivory);
         color: var(--ink);
         font-family: 'Almarai', 'Segoe UI', Tahoma, sans-serif;
         -webkit-text-size-adjust: 100%;
+
+        background-color: var(--ivory);
+        background-image:
+          radial-gradient(
+            circle at 10% 5%,
+            rgba(185, 167, 121, 0.14) 0%,
+            rgba(185, 167, 121, 0) 45%
+          ),
+          radial-gradient(
+            circle at 94% 90%,
+            rgba(23, 53, 47, 0.09) 0%,
+            rgba(23, 53, 47, 0) 50%
+          ),
+          url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cpolygon%20points%3D%2280.00%2C50.00%2060.53%2C54.36%2071.21%2C71.21%2054.36%2C60.53%2050.00%2C80.00%2045.64%2C60.53%2028.79%2C71.21%2039.47%2C54.36%2020.00%2C50.00%2039.47%2C45.64%2028.79%2C28.79%2045.64%2C39.47%2050.00%2C20.00%2054.36%2C39.47%2071.21%2C28.79%2060.53%2C45.64%22%20fill%3D%22none%22%20stroke%3D%22rgba%2823%2C53%2C47%2C0.05%29%22%20stroke-width%3D%220.55%22%2F%3E%3Cpolygon%20points%3D%2274.00%2C50.00%2058.43%2C53.49%2066.97%2C66.97%2053.49%2C58.43%2050.00%2C74.00%2046.51%2C58.43%2033.03%2C66.97%2041.57%2C53.49%2026.00%2C50.00%2041.57%2C46.51%2033.03%2C33.03%2046.51%2C41.57%2050.00%2C26.00%2053.49%2C41.57%2066.97%2C33.03%2058.43%2C46.51%22%20fill%3D%22none%22%20stroke%3D%22rgba%28185%2C167%2C121%2C0.09%29%22%20stroke-width%3D%220.55%22%2F%3E%3Cpolygon%20points%3D%2250%2C8%2092%2C50%2050%2C92%208%2C50%22%20fill%3D%22none%22%20stroke%3D%22rgba%28185%2C167%2C121%2C0.09%29%22%20stroke-width%3D%220.55%22%2F%3E%3C%2Fsvg%3E");
+        background-repeat: no-repeat, no-repeat, repeat;
+        background-position: center, center, center;
+        background-size: cover, cover, var(--tile) var(--tile);
+        background-attachment: fixed, fixed, fixed;
       }
+
+      /* The four corner brackets, framing the content below the header —
+         tucking them under the pine bar would just hide the top pair. */
+      .frame {
+        position: fixed;
+        top: calc(env(safe-area-inset-top) + 100px);
+        right: 18px;
+        bottom: calc(env(safe-area-inset-bottom) + 18px);
+        left: 18px;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .frame span { position: absolute; width: 46px; height: 46px; }
+      .frame span::after {
+        content: '';
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        border: inherit;
+        border-radius: inherit;
+      }
+      .frame .tl, .frame .tr { border-color: rgba(185, 167, 121, 0.32); }
+      .frame .bl, .frame .br { border-color: rgba(23, 53, 47, 0.22); }
+      .frame .tl {
+        top: 0; left: 0;
+        border-top: 2.2px solid; border-left: 2.2px solid;
+      }
+      .frame .tl::after { top: 9px; left: 9px; }
+      .frame .tr {
+        top: 0; right: 0;
+        border-top: 2.2px solid; border-right: 2.2px solid;
+      }
+      .frame .tr::after { top: 9px; right: 9px; }
+      .frame .bl {
+        bottom: 0; left: 0;
+        border-bottom: 2.2px solid; border-left: 2.2px solid;
+      }
+      .frame .bl::after { bottom: 9px; left: 9px; }
+      .frame .br {
+        bottom: 0; right: 0;
+        border-bottom: 2.2px solid; border-right: 2.2px solid;
+      }
+      .frame .br::after { bottom: 9px; right: 9px; }
+
+      header, main { position: relative; z-index: 1; }
 
       header {
         background: linear-gradient(135deg, #1e453c, var(--pine) 55%, var(--pine-deep));
@@ -176,6 +247,11 @@
   </head>
 
   <body>
+    <div class="frame" aria-hidden="true">
+      <span class="tl"></span><span class="tr"></span>
+      <span class="bl"></span><span class="br"></span>
+    </div>
+
     <header>
       <img src="./assets/logo.jpg" alt="" />
       <div>
@@ -219,7 +295,7 @@
         <dl class="facts" id="facts"></dl>
 
         <p class="note">
-          تم فك تشفير وتوثيق رمز الهوية محلياً بالكامل.
+          تم فك تشفير وتوثيق رمز البطاقة محلياً بالكامل.
           تظهر البطاقة هنا كنسخة تحقق رقمية معتمدة ومطابقة للسجلات الرسمية.
         </p>
       </section>

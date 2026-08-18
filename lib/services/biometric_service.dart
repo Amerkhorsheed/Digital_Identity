@@ -222,7 +222,7 @@ class BiometricService {
     try {
       final matched = await _auth.authenticate(
         localizedReason:
-            'ضع إصبع المتقدّم على مستشعر الجهاز لتوثيق بصمته ضمن بطاقة الهوية.',
+            'ضع إصبع المتقدّم على مستشعر الجهاز لتوثيق بصمته ضمن البطاقة.',
         biometricOnly: true,
         sensitiveTransaction: true,
         persistAcrossBackgrounding: true,

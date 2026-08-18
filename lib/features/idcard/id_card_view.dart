@@ -502,7 +502,7 @@ class IdCardBack extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
-                      'بيانات الهوية',
+                      'بيانات المنتسب',
                       maxLines: 1,
                       style: TextStyle(
                         fontSize: cardWidth * 0.028,

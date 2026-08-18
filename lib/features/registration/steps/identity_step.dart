@@ -58,7 +58,7 @@ class _IdentityStepState extends State<IdentityStep> {
       hero: const StepHero(
         number: 1,
         icon: Icons.badge_outlined,
-        title: 'الهوية الشخصية',
+        title: 'البيانات الشخصية',
         subtitle: 'أدخل اسمك الثلاثي، سنة ميلادك، المرحلة الدراسية، ومحافظتك.',
       ),
       children: [

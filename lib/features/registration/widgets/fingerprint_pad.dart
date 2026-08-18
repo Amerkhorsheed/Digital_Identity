@@ -221,8 +221,11 @@ class _FingerprintPadState extends State<FingerprintPad>
           onPointerCancel: (_) => _onPointerUp(),
           child: Semantics(
             label: 'لوحة التقاط البصمة — ضع إصبعك واثبت',
-            child: SizedBox.square(
-              dimension: widget.size,
+            // A fingertip is taller than it is wide, so the box is too — a
+            // square box would leave dead space either side of the shape.
+            child: SizedBox(
+              width: widget.size,
+              height: widget.size * 1.18,
               child: AnimatedBuilder(
                 animation: _progress,
                 builder: (context, _) => CustomPaint(
@@ -254,8 +257,9 @@ class _FingerprintPadState extends State<FingerprintPad>
 // الرسم
 // -----------------------------------------------------------------------------
 
-/// يرسم سطح اللوحة، ونمط الخطوط الذي ينكشف تدريجيًا، وشريط المسح، وحلقة
-/// التقدّم، ونقاط التفاصيل الدقيقة عند الاكتمال.
+/// يرسم اللوحة على هيئة **بصمة إصبع**: حدّ الإصبع نفسه، ونمط الخطوط الذي
+/// ينكشف تدريجيًا داخله، وشريط المسح، وخط التقدّم على المحيط، ونقاط التفاصيل
+/// الدقيقة عند الاكتمال.
 class _FingerprintPadPainter extends CustomPainter {
   _FingerprintPadPainter({
     required this.progress,
@@ -281,47 +285,94 @@ class _FingerprintPadPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final radius = Radius.circular(size.width * 0.30);
-    final plate = RRect.fromRectAndRadius(rect.deflate(6), radius);
+    final finger = _fingerPath(size);
+    final bounds = finger.getBounds();
 
-    _paintPlate(canvas, plate);
-    _paintRidges(canvas, plate, size);
+    _paintPad(canvas, finger, bounds);
+    _paintRidges(canvas, finger, bounds);
     if (contact != null && stage == FingerprintPadStage.scanning) {
-      _paintContactGlow(canvas, plate);
+      _paintContactGlow(canvas, finger);
     }
     if (stage == FingerprintPadStage.scanning) {
-      _paintSweep(canvas, plate, size);
+      _paintSweep(canvas, finger, size);
     }
     if (stage == FingerprintPadStage.complete) {
-      _paintMinutiae(canvas, plate, size);
+      _paintMinutiae(canvas, finger, bounds);
     }
-    _paintBezel(canvas, plate, size);
-    _paintProgressRing(canvas, rect, size);
+    _paintOutline(canvas, finger);
+    _paintProgress(canvas, finger);
   }
 
-  // --- سطح اللوحة -----------------------------------------------------------
+  // --- شكل الإصبع -----------------------------------------------------------
 
-  void _paintPlate(Canvas canvas, RRect plate) {
-    canvas.drawRRect(
-      plate,
+  /// حدّ بُصلة الإصبع: قبّة عريضة في الأعلى، وجانبان يستدقّان قليلًا نحو
+  /// الأسفل، وطرف مستدير. هذا ما يجعل اللوحة تُقرأ كإصبع لا كمربّع.
+  Path _fingerPath(Size size) {
+    final cx = size.width / 2;
+    final halfW = size.width * 0.30;
+    final top = size.height * 0.045;
+    final bottom = size.height * 0.955;
+    final waist = size.height * 0.44;
+
+    return Path()
+      ..moveTo(cx - halfW, waist)
+      ..cubicTo(
+        cx - halfW,
+        top + size.height * 0.02,
+        cx - halfW * 0.58,
+        top,
+        cx,
+        top,
+      )
+      ..cubicTo(
+        cx + halfW * 0.58,
+        top,
+        cx + halfW,
+        top + size.height * 0.02,
+        cx + halfW,
+        waist,
+      )
+      ..cubicTo(
+        cx + halfW,
+        bottom - size.height * 0.20,
+        cx + halfW * 0.84,
+        bottom,
+        cx,
+        bottom,
+      )
+      ..cubicTo(
+        cx - halfW * 0.84,
+        bottom,
+        cx - halfW,
+        bottom - size.height * 0.20,
+        cx - halfW,
+        waist,
+      )
+      ..close();
+  }
+
+  // --- سطح الإصبع -----------------------------------------------------------
+
+  void _paintPad(Canvas canvas, Path finger, Rect bounds) {
+    canvas.drawPath(
+      finger,
       Paint()
         ..shader = ui.Gradient.linear(
-          plate.outerRect.topCenter,
-          plate.outerRect.bottomCenter,
+          bounds.topCenter,
+          bounds.bottomCenter,
           const [_plateTop, _plateBottom],
         ),
     );
 
     // لمعة زجاجية خفيفة في الربع العلوي.
     canvas.save();
-    canvas.clipRRect(plate);
+    canvas.clipPath(finger);
     canvas.drawRect(
-      plate.outerRect,
+      bounds,
       Paint()
         ..shader = ui.Gradient.linear(
-          plate.outerRect.topLeft,
-          plate.outerRect.centerLeft,
+          bounds.topLeft,
+          bounds.centerLeft,
           [
             Colors.white.withValues(alpha: 0.07),
             Colors.white.withValues(alpha: 0),
@@ -334,22 +385,23 @@ class _FingerprintPadPainter extends CustomPainter {
   // --- نمط الخطوط ----------------------------------------------------------
 
   /// يرسم نمط دوّامة (whorl) واقعيًا: حلقات متحدة المركز مشوّهة عضويًا مع
-  /// انقطاعات تمثّل نهايات الخطوط، تمامًا كما تبدو بصمة حقيقية.
-  void _paintRidges(Canvas canvas, RRect plate, Size size) {
+  /// انقطاعات تمثّل نهايات الخطوط، تمامًا كما تبدو بصمة حقيقية. تُقصّ عند حدّ
+  /// الإصبع فتنتهي الخطوط على الحافة كما تنتهي على إصبع حقيقي.
+  void _paintRidges(Canvas canvas, Path finger, Rect bounds) {
     canvas.save();
-    canvas.clipRRect(plate.deflate(2));
+    canvas.clipPath(finger);
 
-    final core = Offset(size.width * 0.5, size.height * 0.46);
-    final ridges = _buildRidges(core, size);
+    final core = Offset(bounds.center.dx, bounds.top + bounds.height * 0.38);
+    final ridges = _buildRidges(core, bounds);
 
-    // الطبقة الخافتة: النمط كاملًا، ليبدو السطح كمستشعر لا كمربّع فارغ.
+    // الطبقة الخافتة: النمط كاملًا، ليبدو السطح كبصمة لا كشكل فارغ.
     final dim = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
       ..strokeCap = StrokeCap.round
       ..isAntiAlias = true
       ..color = BrandColors.goldSoft
-          .withValues(alpha: stage == FingerprintPadStage.idle ? 0.10 : 0.14);
+          .withValues(alpha: stage == FingerprintPadStage.idle ? 0.12 : 0.16);
     for (final ridge in ridges) {
       canvas.drawPath(ridge, dim);
     }
@@ -361,7 +413,7 @@ class _FingerprintPadPainter extends CustomPainter {
     if (revealed > 0) {
       canvas.save();
       canvas.clipRect(
-        Rect.fromLTWH(0, 0, size.width, size.height * revealed),
+        Rect.fromLTWH(0, 0, bounds.right + 8, bounds.bottom * revealed),
       );
       final bright = Paint()
         ..style = PaintingStyle.stroke
@@ -369,8 +421,8 @@ class _FingerprintPadPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round
         ..isAntiAlias = true
         ..shader = ui.Gradient.linear(
-          Offset(0, 0),
-          Offset(0, size.height),
+          bounds.topCenter,
+          bounds.bottomCenter,
           const [BrandColors.goldGlow, BrandColors.gold],
         );
       for (final ridge in ridges) {
@@ -383,14 +435,14 @@ class _FingerprintPadPainter extends CustomPainter {
   }
 
   /// يبني مسارات الخطوط. النمط ثابت لبذرة معيّنة، فلا يرتجف بين الإطارات.
-  List<Path> _buildRidges(Offset core, Size size) {
+  List<Path> _buildRidges(Offset core, Rect bounds) {
     final random = math.Random(seed);
     final paths = <Path>[];
-    final spacing = size.width * 0.038;
+    final spacing = bounds.width * 0.052;
 
-    // إزاحات عشوائية تُحسب مرة واحدة لكل خط، فتبقى ثابتة طوال الالتقاط.
-    for (var i = 0; i < 22; i++) {
-      final baseRadius = spacing * (i + 1.2);
+    // الخطوط تُقصّ عند الحدّ، فتُرسم أوسع من الإصبع كي تملأه حتى الحافة.
+    for (var i = 0; i < 26; i++) {
+      final baseRadius = spacing * (i + 1.1);
       final phase = random.nextDouble() * math.pi * 2;
       final wobble = 0.06 + random.nextDouble() * 0.07;
       // فجوات تمثّل نهايات الخطوط وتشعّباتها.
@@ -402,7 +454,7 @@ class _FingerprintPadPainter extends CustomPainter {
       final path = Path();
       var drawing = false;
 
-      const steps = 132;
+      const steps = 148;
       for (var s = 0; s <= steps; s++) {
         final theta = s / steps * math.pi * 2;
 
@@ -417,10 +469,10 @@ class _FingerprintPadPainter extends CustomPainter {
             (1 +
                 wobble * math.sin(2 * theta + phase) +
                 wobble * 0.5 * math.sin(5 * theta + phase * 1.7));
-        // استطالة رأسية خفيفة تعطي شكل البصمة الحقيقي لا دائرة مثالية.
+        // استطالة رأسية تتبع استطالة الإصبع نفسه.
         final point = Offset(
           core.dx + r * math.cos(theta),
-          core.dy + r * math.sin(theta) * 1.22,
+          core.dy + r * math.sin(theta) * 1.45,
         );
 
         if (drawing) {
@@ -438,10 +490,10 @@ class _FingerprintPadPainter extends CustomPainter {
   // --- وهج التماسّ ----------------------------------------------------------
 
   /// وهج ناعم يتبع نقطة التماسّ الفعلية، فتستجيب اللوحة للإصبع الحقيقي.
-  void _paintContactGlow(Canvas canvas, RRect plate) {
+  void _paintContactGlow(Canvas canvas, Path finger) {
     final point = contact!;
     canvas.save();
-    canvas.clipRRect(plate);
+    canvas.clipPath(finger);
     canvas.drawCircle(
       point,
       contactRadius * 2.1,
@@ -460,9 +512,9 @@ class _FingerprintPadPainter extends CustomPainter {
 
   // --- شريط المسح ----------------------------------------------------------
 
-  void _paintSweep(Canvas canvas, RRect plate, Size size) {
+  void _paintSweep(Canvas canvas, Path finger, Size size) {
     canvas.save();
-    canvas.clipRRect(plate);
+    canvas.clipPath(finger);
     final y = size.height * progress;
 
     // هالة أسفل الخط تعطي إحساس الضوء المنعكس.
@@ -500,11 +552,11 @@ class _FingerprintPadPainter extends CustomPainter {
   // --- نقاط التفاصيل الدقيقة ------------------------------------------------
 
   /// علامات صغيرة عند نهايات الخطوط، كما تعرضها برامج تحليل البصمات.
-  void _paintMinutiae(Canvas canvas, RRect plate, Size size) {
+  void _paintMinutiae(Canvas canvas, Path finger, Rect bounds) {
     canvas.save();
-    canvas.clipRRect(plate);
+    canvas.clipPath(finger);
     final random = math.Random(seed ^ 0x5eed);
-    final core = Offset(size.width * 0.5, size.height * 0.46);
+    final core = Offset(bounds.center.dx, bounds.top + bounds.height * 0.38);
 
     final stroke = Paint()
       ..style = PaintingStyle.stroke
@@ -513,10 +565,10 @@ class _FingerprintPadPainter extends CustomPainter {
 
     for (var i = 0; i < 9; i++) {
       final theta = random.nextDouble() * math.pi * 2;
-      final r = size.width * (0.10 + random.nextDouble() * 0.26);
+      final r = bounds.width * (0.12 + random.nextDouble() * 0.34);
       final at = Offset(
         core.dx + r * math.cos(theta),
-        core.dy + r * math.sin(theta) * 1.22,
+        core.dy + r * math.sin(theta) * 1.45,
       );
       canvas.drawCircle(at, 4.2, stroke);
       canvas.drawCircle(
@@ -528,49 +580,48 @@ class _FingerprintPadPainter extends CustomPainter {
     canvas.restore();
   }
 
-  // --- الإطار وحلقة التقدّم -------------------------------------------------
+  // --- الحدّ وخط التقدّم -----------------------------------------------------
 
-  void _paintBezel(Canvas canvas, RRect plate, Size size) {
-    final accent = switch (stage) {
-      FingerprintPadStage.complete => BrandColors.success,
-      FingerprintPadStage.scanning =>
-        readable ? BrandColors.success : BrandColors.goldGlow,
-      FingerprintPadStage.idle => BrandColors.goldSoft,
-    };
+  Color get _accent => switch (stage) {
+        FingerprintPadStage.complete => BrandColors.success,
+        FingerprintPadStage.scanning =>
+          readable ? BrandColors.success : BrandColors.goldGlow,
+        FingerprintPadStage.idle => BrandColors.goldSoft,
+      };
 
-    canvas.drawRRect(
-      plate,
+  void _paintOutline(Canvas canvas, Path finger) {
+    canvas.drawPath(
+      finger,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.0
-        ..color = accent.withValues(
+        ..color = _accent.withValues(
           alpha: stage == FingerprintPadStage.idle ? 0.65 : 0.95,
         ),
     );
   }
 
-  void _paintProgressRing(Canvas canvas, Rect rect, Size size) {
+  /// خط التقدّم يجري على حدّ الإصبع نفسه، فالإطار والمقياس شيء واحد.
+  void _paintProgress(Canvas canvas, Path finger) {
     if (stage != FingerprintPadStage.scanning &&
         stage != FingerprintPadStage.complete) {
       return;
     }
     final value = stage == FingerprintPadStage.complete ? 1.0 : progress;
-    final ring = rect.deflate(2.5);
-    final radius = Radius.circular(size.width * 0.32);
 
-    final path = Path()
-      ..addRRect(RRect.fromRectAndRadius(ring, radius));
-    final metrics = path.computeMetrics().toList();
+    final metrics = finger.computeMetrics().toList();
     if (metrics.isEmpty) return;
-
     final metric = metrics.first;
-    // يبدأ القوس من منتصف الحافة العليا فيقرأ كحلقة تقدّم لا كخط عشوائي.
+
+    // يبدأ القوس من قمة الإصبع فيقرأ كمقياس تقدّم لا كخط عشوائي.
     final start = metric.length * 0.125;
     final sweep = metric.length * value;
 
-    final drawn = Path();
-    final first = metric.extractPath(start, math.min(metric.length, start + sweep));
-    drawn.addPath(first, Offset.zero);
+    final drawn = Path()
+      ..addPath(
+        metric.extractPath(start, math.min(metric.length, start + sweep)),
+        Offset.zero,
+      );
     final overflow = start + sweep - metric.length;
     if (overflow > 0) {
       drawn.addPath(metric.extractPath(0, overflow), Offset.zero);

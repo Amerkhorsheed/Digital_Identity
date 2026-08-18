@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../app/theme/brand_colors.dart';
 import '../../../models/applicant.dart';
-import '../../../models/vision_test.dart';
 import '../../../shared/widgets/adaptive_layout.dart';
-import '../../../shared/widgets/brand_widgets.dart';
-import '../../../shared/widgets/step_fields.dart';
-import '../../eyetest/eye_test_page.dart';
 import '../registration_page.dart';
 import '../widgets/step_layout.dart';
 
-/// Step 2 — health profile: body measurements (sliders), blood type and the eye test.
+/// Step 3 — health profile: body measurements and blood group.
+///
+/// The sight check used to live here too; it now has its own page, which
+/// leaves this one to the three things a clerk can read straight off a scale
+/// and a chart.
 class HealthStep extends StatefulWidget {
   const HealthStep({
     super.key,
@@ -28,41 +29,14 @@ class HealthStep extends StatefulWidget {
 }
 
 class _HealthStepState extends State<HealthStep> {
-  bool _manualEntry = false;
-
   void _update(VoidCallback apply) {
     apply();
     widget.onChanged();
   }
 
-  Future<void> _runEyeTest() async {
-    final report = await EyeTestPage.show(context);
-    if (report == null || !mounted) return;
-    _update(() {
-      widget.draft.visionTest = report;
-      widget.draft.rightEyeAcuity = report.right.acuity;
-      widget.draft.leftEyeAcuity = report.left.acuity;
-      _manualEntry = false;
-    });
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text('تم تسجيل نتيجة فحص النظر بنجاح.'),
-          // The result is already on the panel behind this bar, so the message
-          // is a confirmation and not something anyone stops to read — it
-          // clears itself well before it starts feeling like it is in the way.
-          duration: Duration(milliseconds: 1200),
-        ),
-      );
-  }
-
   @override
   Widget build(BuildContext context) {
     final draft = widget.draft;
-    final hasResult =
-        draft.rightEyeAcuity != null && draft.leftEyeAcuity != null;
 
     final currentHeight = draft.heightCm ?? 172;
     final currentWeight = draft.weightKg ?? 68.0;
@@ -72,7 +46,7 @@ class _HealthStepState extends State<HealthStep> {
         number: 2,
         icon: Icons.favorite_outline_rounded,
         title: 'الملف الصحي',
-        subtitle: 'حدد قياساتك الجسمية، فصيلة دمك، وفحص حدة الإبصار.',
+        subtitle: 'حدد قياساتك الجسمية وفصيلة دمك.',
       ),
       children: [
         FormGrid(
@@ -109,35 +83,10 @@ class _HealthStepState extends State<HealthStep> {
               ),
             ),
             FormGridSpan(
-              child: BrandDropdown<BloodType>(
-                label: 'فصيلة الدم',
+              child: _BloodTypePicker(
                 value: draft.bloodType,
-                items: BloodType.values,
-                labelFor: (type) => type.label,
-                icon: Icons.bloodtype_outlined,
                 error: widget.errors['bloodType'],
                 onChanged: (value) => _update(() => draft.bloodType = value),
-              ),
-            ),
-            FormGridSpan(
-              child: _EyeTestPanel(
-                report: draft.visionTest,
-                rightEye: draft.rightEyeAcuity,
-                leftEye: draft.leftEyeAcuity,
-                error: widget.errors['vision'],
-                manualEntry: _manualEntry,
-                hasResult: hasResult,
-                onStartTest: _runEyeTest,
-                onToggleManual: () =>
-                    setState(() => _manualEntry = !_manualEntry),
-                onRightChanged: (value) => _update(() {
-                  draft.rightEyeAcuity = value;
-                  draft.visionTest = null;
-                }),
-                onLeftChanged: (value) => _update(() {
-                  draft.leftEyeAcuity = value;
-                  draft.visionTest = null;
-                }),
               ),
             ),
           ],
@@ -183,9 +132,7 @@ class _MeasurementSlider extends StatelessWidget {
         color: BrandColors.surface,
         borderRadius: BorderRadius.circular(BrandRadii.medium),
         border: Border.all(
-          color: error != null
-              ? BrandColors.error
-              : BrandColors.outlineSoft,
+          color: error != null ? BrandColors.error : BrandColors.outlineSoft,
           width: 1.2,
         ),
         boxShadow: [
@@ -213,7 +160,10 @@ class _MeasurementSlider extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   gradient: BrandGradients.gold,
                   borderRadius: BorderRadius.circular(BrandRadii.pill),
@@ -242,8 +192,10 @@ class _MeasurementSlider extends StatelessWidget {
             children: [
               IconButton(
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.remove_circle_outline_rounded,
-                    color: BrandColors.pine),
+                icon: const Icon(
+                  Icons.remove_circle_outline_rounded,
+                  color: BrandColors.pine,
+                ),
                 onPressed: clamped > min
                     ? () {
                         final step = (max - min) / divisions;
@@ -278,8 +230,10 @@ class _MeasurementSlider extends StatelessWidget {
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.add_circle_outline_rounded,
-                    color: BrandColors.pine),
+                icon: const Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: BrandColors.pine,
+                ),
                 onPressed: clamped < max
                     ? () {
                         final step = (max - min) / divisions;
@@ -306,359 +260,227 @@ class _MeasurementSlider extends StatelessWidget {
   }
 }
 
-/// The eye-test block: launches the interactive Snellen chart, shows the
-/// measured result, and keeps a manual fallback for users who already hold a
-/// report from an optometrist.
-class _EyeTestPanel extends StatelessWidget {
-  const _EyeTestPanel({
-    required this.report,
-    required this.rightEye,
-    required this.leftEye,
-    required this.error,
-    required this.manualEntry,
-    required this.hasResult,
-    required this.onStartTest,
-    required this.onToggleManual,
-    required this.onRightChanged,
-    required this.onLeftChanged,
+/// Blood group, picked from the eight groups laid out at once.
+///
+/// A dropdown hid all eight behind a tap and a scroll, which is the wrong
+/// shape for a set this small and this fixed. Laid out as a grid the whole
+/// answer space is visible, the selection is one tap, and the group letters —
+/// the part a medic actually reads — are set large in the mono face with the
+/// Rh sign carried as a separate mark rather than buried in the string.
+class _BloodTypePicker extends StatelessWidget {
+  const _BloodTypePicker({
+    required this.value,
+    required this.onChanged,
+    this.error,
   });
 
-  final VisionTestReport? report;
-  final VisualAcuity? rightEye;
-  final VisualAcuity? leftEye;
+  final BloodType? value;
+  final ValueChanged<BloodType> onChanged;
   final String? error;
-  final bool manualEntry;
-  final bool hasResult;
-  final VoidCallback onStartTest;
-  final VoidCallback onToggleManual;
-  final ValueChanged<VisualAcuity?> onRightChanged;
-  final ValueChanged<VisualAcuity?> onLeftChanged;
 
   @override
   Widget build(BuildContext context) {
-    final band = Adaptive.bandOf(context);
-
     return Container(
-      padding: EdgeInsets.all(band.isCompact ? 18 : 22),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [
-            BrandColors.goldMist,
-            BrandColors.surface,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(BrandRadii.large),
+        color: BrandColors.surface,
+        borderRadius: BorderRadius.circular(BrandRadii.medium),
         border: Border.all(
-          color: error != null ? BrandColors.error : BrandColors.goldSoft,
-          width: 1.4,
+          color: error != null ? BrandColors.error : BrandColors.outlineSoft,
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: BrandColors.gold.withValues(alpha: 0.12),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: BrandColors.pine.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: BrandColors.pine.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(BrandRadii.medium),
-                ),
-                child: const Icon(
-                  Icons.remove_red_eye_outlined,
-                  color: BrandColors.pine,
-                  size: 24,
+              const Icon(
+                Icons.bloodtype_outlined,
+                size: 22,
+                color: BrandColors.pine,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'فصيلة الدم',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: BrandColors.ink,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'فحص حدة الإبصار التفاعلي',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: BrandColors.pine,
+              const Spacer(),
+              AnimatedSwitcher(
+                duration: BrandDurations.quick,
+                child: value == null
+                    ? const SizedBox.shrink()
+                    : Container(
+                        key: ValueKey(value),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: BrandGradients.gold,
+                          borderRadius: BorderRadius.circular(BrandRadii.pill),
+                        ),
+                        child: Text(
+                          value!.label,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            fontFamily: 'SpaceMono',
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Four across on anything phone-width or wider, so the eight
+              // groups land as two clean rows of A / B / AB / O.
+              const gap = 10.0;
+              final columns = constraints.maxWidth >= 260 ? 4 : 2;
+              final tile =
+                  (constraints.maxWidth - gap * (columns - 1)) / columns;
+
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  for (final type in BloodType.values)
+                    SizedBox(
+                      key: ValueKey(type),
+                      width: tile,
+                      child: _BloodTile(
+                        type: type,
+                        selected: type == value,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          onChanged(type);
+                        },
                       ),
                     ),
-                    const SizedBox(height: 2),
+                ],
+              );
+            },
+          ),
+          if (error != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              error!,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: BrandColors.error,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _BloodTile extends StatelessWidget {
+  const _BloodTile({
+    required this.type,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final BloodType type;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // 'AB−' → group 'AB', sign '−'. The sign is the part that gets missed at a
+    // glance, so it is drawn as its own mark instead of a trailing character.
+    final label = type.label;
+    final group = label.substring(0, label.length - 1);
+    final sign = label.substring(label.length - 1);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'فصيلة الدم $label',
+      child: AnimatedContainer(
+        duration: BrandDurations.quick,
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          gradient: selected ? BrandGradients.pine : null,
+          color: selected ? null : BrandColors.goldMist,
+          borderRadius: BorderRadius.circular(BrandRadii.medium),
+          border: Border.all(
+            color: selected ? BrandColors.gold : BrandColors.outlineSoft,
+            width: selected ? 1.6 : 1.2,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: BrandColors.pine.withValues(alpha: 0.28),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                ]
+              : null,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(BrandRadii.medium),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(BrandRadii.medium),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              // Blood groups are written left to right the world over — under
+              // the page's RTL direction the sign would jump ahead of the
+              // letter and read as '+A'.
+              child: Directionality(
+                textDirection: TextDirection.ltr,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      'اختبار حقيقي للعينين بجدول سنيلن المعياري',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: BrandColors.inkMuted,
-                          ),
+                      group,
+                      style: TextStyle(
+                        fontSize: 20,
+                        height: 1,
+                        fontWeight: FontWeight.w800,
+                        fontFamily: 'SpaceMono',
+                        color: selected ? Colors.white : BrandColors.pine,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      sign,
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.05,
+                        fontWeight: FontWeight.w800,
+                        color: selected
+                            ? BrandColors.goldGlow
+                            : BrandColors.goldDeep,
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (hasResult && !manualEntry)
-            _EyeTestResultCard(
-              report: report,
-              rightEye: rightEye!,
-              leftEye: leftEye!,
-              onRetest: onStartTest,
-            )
-          else if (!manualEntry)
-            _StartTestPrompt(onStart: onStartTest),
-          if (manualEntry) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: BrandDropdown<VisualAcuity>(
-                    label: 'العين اليمنى — حدة الإبصار',
-                    value: rightEye,
-                    items: VisualAcuity.values,
-                    labelFor: (acuity) => acuity.label,
-                    icon: Icons.remove_red_eye_rounded,
-                    onChanged: onRightChanged,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: BrandDropdown<VisualAcuity>(
-                    label: 'العين اليسرى — حدة الإبصار',
-                    value: leftEye,
-                    items: VisualAcuity.values,
-                    labelFor: (acuity) => acuity.label,
-                    icon: Icons.remove_red_eye_outlined,
-                    onChanged: onLeftChanged,
-                  ),
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 12),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: TextButton.icon(
-              onPressed: onToggleManual,
-              icon: Icon(
-                manualEntry
-                    ? Icons.videocam_outlined
-                    : Icons.description_outlined,
-                size: 18,
-              ),
-              label: Text(
-                manualEntry
-                    ? 'العودة إلى الفحص التفاعلي'
-                    : 'لديّ تقرير طبي جاهز (إدخال يدوي)',
-              ),
-              style: TextButton.styleFrom(
-                foregroundColor: BrandColors.ink,
-                textStyle: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
             ),
           ),
-          if (error != null) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.error_outline_rounded,
-                    size: 16, color: BrandColors.error),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    error!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: BrandColors.error,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _StartTestPrompt extends StatelessWidget {
-  const _StartTestPrompt({required this.onStart});
-
-  final VoidCallback onStart;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(BrandRadii.medium),
-        border: Border.all(color: BrandColors.goldSoft),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'فحص سريع ومباشر (٥ محاولات فقط) بالعينين معاً لتحديد حدة الإبصار.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13.5,
-              color: BrandColors.inkMuted,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 14),
-          BrandButton(
-            label: 'بدء فحص النظر السريع الآن',
-            icon: Icons.play_arrow_rounded,
-            onPressed: onStart,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EyeTestResultCard extends StatelessWidget {
-  const _EyeTestResultCard({
-    required this.report,
-    required this.rightEye,
-    required this.leftEye,
-    required this.onRetest,
-  });
-
-  final VisionTestReport? report;
-  final VisualAcuity rightEye;
-  final VisualAcuity leftEye;
-  final VoidCallback onRetest;
-
-  @override
-  Widget build(BuildContext context) {
-    final isUnified = rightEye == leftEye;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(BrandRadii.medium),
-        border: Border.all(color: BrandColors.goldSoft),
-      ),
-      child: Column(
-        children: [
-          if (isUnified)
-            _EyeScorePill(
-              title: 'حدة الإبصار (بالعينين معاً)',
-              score: rightEye.label,
-              icon: Icons.visibility_rounded,
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: _EyeScorePill(
-                    title: 'العين اليمنى',
-                    score: rightEye.label,
-                    icon: Icons.remove_red_eye_rounded,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _EyeScorePill(
-                    title: 'العين اليسرى',
-                    score: leftEye.label,
-                    icon: Icons.remove_red_eye_outlined,
-                  ),
-                ),
-              ],
-            ),
-          if (report != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              'أُجري الفحص السريع تفاعلياً (٥ فحوصات معيارية)',
-              style: const TextStyle(
-                fontSize: 12,
-                color: BrandColors.inkMuted,
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: onRetest,
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('إعادة فحص النظر'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: BrandColors.pine,
-              side: const BorderSide(color: BrandColors.goldSoft),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(BrandRadii.pill),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EyeScorePill extends StatelessWidget {
-  const _EyeScorePill({
-    required this.title,
-    required this.score,
-    required this.icon,
-  });
-
-  final String title;
-  final String score;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: BrandColors.goldMist,
-        borderRadius: BorderRadius.circular(BrandRadii.medium),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: BrandColors.pine),
-              const SizedBox(width: 6),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: BrandColors.pine,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            score,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: BrandColors.pine,
-              fontFamily: 'SpaceMono',
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

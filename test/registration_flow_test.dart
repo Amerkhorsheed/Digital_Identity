@@ -122,8 +122,8 @@ void main() {
     await tester.tap(find.text('التالي'));
     await tester.pumpAndSettle();
 
-    // Step 1 — identity
-    expect(find.text('الهوية الشخصية'), findsOneWidget);
+    // Step 1 — personal details
+    expect(find.text('البيانات الشخصية'), findsOneWidget);
     await _enterText(tester, 0, 'سارة محمد المزيد');
     await _enterText(tester, 1, '2001');
     await _selectDropdown(tester, 'المرحلة الدراسية', 'جامعة');
@@ -132,29 +132,31 @@ void main() {
     await tester.tap(find.text('متابعة'));
     await tester.pumpAndSettle();
 
-    // Step 2 — health
+    // Step 2 — health. The blood group is picked straight off a grid of the
+    // eight groups rather than out of a dropdown.
     expect(find.text('الملف الصحي'), findsOneWidget);
-    await _selectDropdown(tester, 'فصيلة الدم', 'O+');
-
-    // The eye test is required before the step can be completed.
-    expect(find.text('بدء فحص النظر السريع الآن'), findsOneWidget);
-    await tester.tap(find.text('متابعة'));
+    expect(find.text('فحص حدة الإبصار التفاعلي'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey(BloodType.oPositive)));
     await tester.pumpAndSettle();
-    expect(
-      find.text('أجرِ فحص النظر أو أدخل نتيجة تقريرك الطبي'),
-      findsOneWidget,
-    );
-
-    // Manual entry satisfies it for users holding an optometrist's report.
-    await tester.tap(find.text('لديّ تقرير طبي جاهز (إدخال يدوي)'));
-    await tester.pumpAndSettle();
-    await _selectDropdown(tester, 'العين اليمنى — حدة الإبصار', '20/20');
-    await _selectDropdown(tester, 'العين اليسرى — حدة الإبصار', '20/25');
 
     await tester.tap(find.text('متابعة'));
     await tester.pumpAndSettle();
 
-    // Step 3 — photo & biometric
+    // Step 3 — the sight check, on a page of its own. There is no manual
+    // fallback: the only way past is to take the test.
+    expect(find.text('فحص النظر'), findsOneWidget);
+    expect(find.text('لديّ تقرير طبي جاهز (إدخال يدوي)'), findsNothing);
+    await tester.tap(find.text('متابعة'));
+    await tester.pumpAndSettle();
+    expect(find.text('أجرِ فحص النظر للمتابعة'), findsOneWidget);
+
+    await _runEyeTest(tester);
+    expect(find.text('إعادة الفحص'), findsOneWidget);
+
+    await tester.tap(find.text('متابعة'));
+    await tester.pumpAndSettle();
+
+    // Step 4 — photo & fingerprint
     expect(find.text('الصورة والبصمة'), findsOneWidget);
     expect(find.text('التقاط صورة'), findsOneWidget);
     expect(find.text('اختيار من المكتبة'), findsNothing);
@@ -177,11 +179,10 @@ void main() {
     // signed hardware match is labelled as verified.
     expect(find.text('موثقة'), findsOneWidget);
     expect(find.text('بصمة إصبع — مستشعر الجهاز'), findsOneWidget);
-    expect(find.textContaining('4D1E-8B7A-3C05'), findsOneWidget);
 
-    await tester.tap(find.text('إصدار بطاقة الهوية'));
+    await tester.tap(find.text('إصدار بطاقة'));
     await tester.pumpAndSettle();
-    expect(find.text('الصورة مطلوبة لإصدار بطاقة الهوية'), findsOneWidget);
+    expect(find.text('الصورة مطلوبة لإصدار البطاقة'), findsOneWidget);
   });
 
   testWidgets('result page renders the Arabic card and download actions',
@@ -216,12 +217,12 @@ void main() {
     expect(find.text('إظهار ظهر البطاقة'), findsNothing);
     expect(find.text('إظهار وجه البطاقة'), findsNothing);
     expect(find.byType(QrImageView), findsOneWidget);
-    expect(find.text('بيانات الهوية'), findsOneWidget);
+    expect(find.text('بيانات المنتسب'), findsOneWidget);
     expect(find.text('تكبير رمز التحقق'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 3));
     expect(find.byType(QrImageView), findsOneWidget);
-    expect(find.text('بيانات الهوية'), findsOneWidget);
+    expect(find.text('بيانات المنتسب'), findsOneWidget);
   });
 
   testWidgets('“بدء تسجيل جديد” returns to an empty step one', (tester) async {
@@ -299,4 +300,27 @@ void main() {
     expect(find.text('مسح بطاقة أخرى'), findsOneWidget);
     expect(find.text('بدء تسجيل جديد'), findsNothing);
   });
+}
+
+/// Runs the interactive sight check end to end and accepts its result.
+Future<void> _runEyeTest(WidgetTester tester) async {
+  await tester.tap(find.text('ابدأ الفحص الآن'));
+  await tester.pumpAndSettle();
+
+  await tester.tap(find.text('بدء الفحص السريع الآن'));
+  await tester.pumpAndSettle();
+
+  // Any direction answers a check; the score is irrelevant to the flow.
+  for (var i = 0; i < 5; i++) {
+    await tester.tap(find.text('أعلى'));
+    await tester.pumpAndSettle();
+  }
+
+  await tester.tap(find.text('اعتماد النتيجة والمتابعة'));
+  await tester.pumpAndSettle();
+
+  // The confirmation bar floats over the action bar on its way out; waiting it
+  // out keeps the next tap on the button rather than on the snack.
+  await tester.pump(const Duration(seconds: 2));
+  await tester.pumpAndSettle();
 }
