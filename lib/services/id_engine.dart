@@ -76,7 +76,7 @@ abstract final class IdEngine {
       if (applicant.biometric != null)
         'biometricDetail': applicant.biometric!.toJson(),
       'visionSource': applicant.visionSourceLabel,
-      'issuedBy': 'الهوية الرقمية — أ',
+      'issuedBy': 'إدارة القوى البشرية — أ',
     };
     return const JsonEncoder.withIndent(null).convert(payload);
   }

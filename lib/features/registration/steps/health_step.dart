@@ -48,7 +48,13 @@ class _HealthStepState extends State<HealthStep> {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
-        const SnackBar(content: Text('تم تسجيل نتيجة فحص النظر بنجاح.')),
+        const SnackBar(
+          content: Text('تم تسجيل نتيجة فحص النظر بنجاح.'),
+          // The result is already on the panel behind this bar, so the message
+          // is a confirmation and not something anyone stops to read — it
+          // clears itself well before it starts feeling like it is in the way.
+          duration: Duration(milliseconds: 1200),
+        ),
       );
   }
 

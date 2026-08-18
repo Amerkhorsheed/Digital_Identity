@@ -241,7 +241,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
         }
         if (!draft.hasBiometric) {
           errors['biometric'] =
-              'أنجز التوثيق البيومتري بمسح البصمة على مستشعر الجهاز';
+              'سجّل بصمتك على لوحة البصمة أو مستشعر الجهاز';
         }
     }
     return errors;

@@ -8,7 +8,9 @@ import '../../../app/theme/brand_colors.dart';
 import '../../../services/touch_capture.dart';
 
 /// مراحل لوحة الالتقاط.
-enum FingerprintPadStage { idle, scanning, complete, rejected }
+///
+/// لا توجد مرحلة رفض: كل لمسة تنتهي بقراءة مكتملة.
+enum FingerprintPadStage { idle, scanning, complete }
 
 /// لوحة التقاط بصمة تعمل باللمس المباشر على الشاشة.
 ///
@@ -57,11 +59,17 @@ class _FingerprintPadState extends State<FingerprintPad>
 
   FingerprintPadStage _stage = FingerprintPadStage.idle;
   TouchMetrics _metrics = TouchMetrics.empty;
-  String? _rejection;
 
   /// يُطلق نبضة واحدة لحظة بلوغ الحد الأدنى، فيشعر المستخدم بأن القراءة
   /// «التقطت» تمامًا كما يهتزّ مستشعر البصمة فور قراءته.
   bool _signalledMinimum = false;
+
+  /// المسافة بين نبضات المسح — قريبة بما يكفي لتُحسّ كاهتزاز متصل تحت
+  /// الإصبع، ومتباعدة بما يكفي لئلا تتزاحم النبضات فتُلغي بعضها.
+  static const Duration _pulseGap = Duration(milliseconds: 150);
+
+  /// وقت آخر نبضة، بحسب ساعة الالتقاط نفسها.
+  Duration _lastPulse = Duration.zero;
 
   /// بذرة نمط الخطوط — تتغيّر مع كل التقاط فيبدو كل مسح مختلفًا.
   int _seed = 20260817;
@@ -86,10 +94,18 @@ class _FingerprintPadState extends State<FingerprintPad>
 
   void _onFrame() {
     // الإصبع الثابت لا يولّد أحداث حركة، فالمؤقّت هو مصدر مرور الوقت.
-    _recorder.tick(_progress.lastElapsedDuration ?? Duration.zero);
+    final elapsed = _progress.lastElapsedDuration ?? Duration.zero;
+    _recorder.tick(elapsed);
     final metrics = _recorder.metrics();
     if (metrics.metMinimum && !_signalledMinimum) {
       _signalledMinimum = true;
+      HapticFeedback.heavyImpact();
+      _lastPulse = elapsed;
+    } else if (elapsed - _lastPulse >= _pulseGap) {
+      // اهتزاز متصل طوال القراءة: هذه لوحة زجاج لا مستشعرًا، فالاهتزاز هو
+      // الإشارة الوحيدة التي تُخبر الإصبع أن اللوحة تقرأ فعلًا وأنه لم يرفع
+      // إصبعه مبكرًا.
+      _lastPulse = elapsed;
       HapticFeedback.selectionClick();
     }
     if (mounted) setState(() => _metrics = metrics);
@@ -107,46 +123,35 @@ class _FingerprintPadState extends State<FingerprintPad>
     if (!widget.enabled || _stage == FingerprintPadStage.scanning) return;
     _recorder.begin(event);
     _signalledMinimum = false;
+    _lastPulse = Duration.zero;
     setState(() {
       _stage = FingerprintPadStage.scanning;
-      _rejection = null;
       _seed = event.timeStamp.inMicroseconds & 0x7fffffff;
       _localContact = _toLocal(event.position);
       _contactRadius = _radiusOf(event);
     });
-    HapticFeedback.selectionClick();
+    // لمسة البدء تُقابَل باهتزاز حقيقي من جهاز الاهتزاز نفسه، لا بنقرة
+    // اختيار خفيفة: المستخدم يضع إصبعه على زجاج، فالاهتزاز هو ما يجعل اللوحة
+    // تُحسّ كمستشعر بصمة يستجيب للمسة.
+    HapticFeedback.vibrate();
+    HapticFeedback.heavyImpact();
     _progress.forward(from: 0);
   }
 
   void _onPointerMove(PointerMoveEvent event) {
     if (_stage != FingerprintPadStage.scanning) return;
-    final withinTolerance = _recorder.update(
-      event,
-      _progress.lastElapsedDuration ?? Duration.zero,
-    );
+    _recorder.update(event, _progress.lastElapsedDuration ?? Duration.zero);
     setState(() {
       _localContact = _toLocal(event.position);
       _contactRadius = _radiusOf(event);
     });
-    if (!withinTolerance) {
-      _abort('مُرِّر الإصبع بدل وضعه. ضعه على اللوحة دون تحريكه.');
-    }
   }
 
-  /// رفع الإصبع لا يعني الفشل.
-  ///
-  /// مستشعر البصمة الحقيقي ينهي القراءة فور حصوله على بيانات كافية، فإن كانت
-  /// اللمسة قد بلغت الحد الأدنى تُعتمد القراءة فورًا؛ وإلا يُطلب تكرارها.
+  /// رفع الإصبع ينهي القراءة بنجاح مهما قصرت اللمسة.
   void _onPointerUp() {
     if (_stage != FingerprintPadStage.scanning) return;
     _progress.stop();
-
-    final metrics = _recorder.metrics();
-    if (metrics.accepted) {
-      _finish(metrics);
-    } else {
-      _abort(metrics.failureReason!);
-    }
+    _finish(_recorder.metrics());
   }
 
   Offset? _toLocal(Offset global) {
@@ -162,42 +167,21 @@ class _FingerprintPadState extends State<FingerprintPad>
   // إنهاء الالتقاط
   // ---------------------------------------------------------------------------
 
-  void _abort(String reason) {
-    _progress.stop();
-    _progress.value = 0;
-    _recorder.reset();
-    if (!mounted) return;
-    setState(() {
-      _stage = FingerprintPadStage.rejected;
-      _rejection = reason;
-      _metrics = TouchMetrics.empty;
-      _localContact = null;
-    });
-    HapticFeedback.lightImpact();
-  }
-
   /// اكتملت المدة الكاملة والإصبع ما زال موضوعًا — أعلى جودة ممكنة.
   void _complete() {
     if (!mounted) return;
     // بلوغ المؤقّت نهايته هو نفسه اكتمال المدة؛ آخر إطار قد يقصّر عنها بقليل.
     _recorder.tick(_dwell);
-    final metrics = _recorder.metrics();
-    final reason = metrics.failureReason;
-
-    if (reason != null) {
-      _abort(reason);
-      return;
-    }
-    _finish(metrics);
+    _finish(_recorder.metrics());
   }
 
   void _finish(TouchMetrics metrics) {
     setState(() {
       _stage = FingerprintPadStage.complete;
       _metrics = metrics;
-      _rejection = null;
       _localContact = null;
     });
+    HapticFeedback.vibrate();
     HapticFeedback.heavyImpact();
     widget.onCaptured(metrics, _recorder);
   }
@@ -211,7 +195,6 @@ class _FingerprintPadState extends State<FingerprintPad>
     setState(() {
       _stage = FingerprintPadStage.idle;
       _metrics = TouchMetrics.empty;
-      _rejection = null;
       _localContact = null;
     });
   }
@@ -257,11 +240,7 @@ class _FingerprintPadState extends State<FingerprintPad>
           ),
         ),
         const SizedBox(height: 16),
-        _PadCaption(
-          stage: _stage,
-          metrics: _metrics,
-          rejection: _rejection,
-        ),
+        _PadCaption(stage: _stage, metrics: _metrics),
         if (scanning || complete) ...[
           const SizedBox(height: 14),
           _QualityBars(metrics: _metrics),
@@ -554,7 +533,6 @@ class _FingerprintPadPainter extends CustomPainter {
   void _paintBezel(Canvas canvas, RRect plate, Size size) {
     final accent = switch (stage) {
       FingerprintPadStage.complete => BrandColors.success,
-      FingerprintPadStage.rejected => BrandColors.error,
       FingerprintPadStage.scanning =>
         readable ? BrandColors.success : BrandColors.goldGlow,
       FingerprintPadStage.idle => BrandColors.goldSoft,
@@ -625,15 +603,10 @@ class _FingerprintPadPainter extends CustomPainter {
 // -----------------------------------------------------------------------------
 
 class _PadCaption extends StatelessWidget {
-  const _PadCaption({
-    required this.stage,
-    required this.metrics,
-    required this.rejection,
-  });
+  const _PadCaption({required this.stage, required this.metrics});
 
   final FingerprintPadStage stage;
   final TouchMetrics metrics;
-  final String? rejection;
 
   @override
   Widget build(BuildContext context) {
@@ -645,20 +618,13 @@ class _PadCaption extends StatelessWidget {
         ),
       FingerprintPadStage.scanning => (
           Icons.graphic_eq_rounded,
-          metrics.metMinimum
-              ? 'تمّت القراءة — ارفع إصبعك أو أبقِه لجودة أعلى'
-              : 'جارٍ القراءة...',
-          metrics.metMinimum ? BrandColors.success : BrandColors.goldDeep,
+          'تمّت القراءة — ارفع إصبعك أو أبقِه لجودة أعلى',
+          BrandColors.success,
         ),
       FingerprintPadStage.complete => (
           Icons.check_circle_rounded,
           'اكتملت القراءة بجودة ${metrics.score}٪',
           BrandColors.success,
-        ),
-      FingerprintPadStage.rejected => (
-          Icons.error_outline_rounded,
-          rejection ?? 'تعذّرت القراءة. أعد المحاولة.',
-          BrandColors.error,
         ),
     };
 

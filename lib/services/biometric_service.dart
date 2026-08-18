@@ -17,7 +17,7 @@ enum BiometricAvailability {
   /// لم يُفحص بعد.
   unknown,
 
-  /// الجهاز لا يملك مستشعرًا بيومتريًا إطلاقًا.
+  /// الجهاز لا يملك مستشعر بصمة إطلاقًا.
   noHardware,
 
   /// يوجد مستشعر لكنه غير متاح حاليًا (مشغول أو معطّل مؤقتًا).
@@ -33,7 +33,7 @@ enum BiometricAvailability {
   lockedOut,
 }
 
-/// وصف قدرات الجهاز البيومترية كما بلّغ عنها نظام التشغيل.
+/// وصف قدرات بصمة الجهاز كما بلّغ عنها نظام التشغيل.
 @immutable
 class BiometricCapabilities {
   const BiometricCapabilities({
@@ -83,7 +83,7 @@ class BiometricCapabilities {
     }
     if (hasFace) return Platform.isIOS ? 'Face ID' : 'مستشعر التعرّف على الوجه';
     if (hasIris) return 'مستشعر القزحية';
-    return 'المستشعر البيومتري';
+    return 'مستشعر البصمة';
   }
 
   /// شرح حالة العتاد بالعربية.
@@ -212,7 +212,7 @@ class BiometricService {
     }
   }
 
-  /// يعرض واجهة النظام ويطلب مطابقة بيومترية حقيقية على المستشعر.
+  /// يعرض واجهة النظام ويطلب مطابقة بصمة حقيقية على المستشعر.
   ///
   /// `biometricOnly` مثبّتة على `true`: التسجيل يتطلّب وضع إصبع على المستشعر،
   /// ولا يقبل رمز قفل الجهاز أو نمطه بديلاً عنه.
@@ -228,7 +228,7 @@ class BiometricService {
         persistAcrossBackgrounding: true,
         authMessages: const <AuthMessages>[
           AndroidAuthMessages(
-            signInTitle: 'التوثيق البيومتري',
+            signInTitle: 'تسجيل البصمة',
             signInHint: 'ضع الإصبع على مستشعر البصمة',
             cancelButton: 'إلغاء',
           ),
@@ -301,7 +301,7 @@ class BiometricService {
 
   /// بصمة تدقيق للمطابقة.
   ///
-  /// ليست قالبًا بيومتريًا ولا مشتقة من بيانات بصمة — نظام التشغيل لا يعطي
+  /// ليست قالب بصمة ولا مشتقة من بيانات بصمة — نظام التشغيل لا يعطي
   /// التطبيق أي بيانات بصمة — بل تجزيء يربط سجلّ البطاقة بلحظة المطابقة
   /// ووسيلتها والمستشعر المستخدَم.
   Future<String> _attestation({

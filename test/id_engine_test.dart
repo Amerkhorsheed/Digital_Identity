@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 final _applicant = Applicant(
   fullName: 'سارة محمد المزيد',
   birthYear: 2001,
-  academicYear: AcademicYear.bachelor,
+  academicYear: AcademicYear.university,
   governorate: 'دمشق',
   heightCm: 165,
   weightKg: 58.5,
@@ -83,7 +83,7 @@ void main() {
       expect(data['id'], 'A-260816-ABC123');
       expect(data['name'], 'سارة محمد المزيد');
       expect(data['birthYear'], 2001);
-      expect(data['academicYear'], 'إجازة جامعية (بكالوريوس)');
+      expect(data['academicYear'], 'جامعة');
       expect(data['governorate'], 'دمشق');
       expect(data['country'], 'الجمهورية العربية السورية');
       expect(data['heightCm'], 165);
@@ -94,7 +94,7 @@ void main() {
       expect(data['biometric'], 'موثقة');
       expect(data['issuedAt'], '2026-08-16T09:30:00.000Z');
       expect(data['visionSource'], 'إدخال يدوي من تقرير سابق');
-      expect(data['issuedBy'], 'الهوية الرقمية — أ');
+      expect(data['issuedBy'], 'إدارة القوى البشرية — أ');
     });
   });
 }

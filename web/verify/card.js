@@ -3,7 +3,6 @@
 // The proportions mirror lib/features/idcard/id_card_view.dart, so a card
 // downloaded from this page matches the one the app produces.
 
-import { encodeQr } from './qr.js';
 import { formatWeight } from './payload.js';
 
 const PINE = '#17352F';
@@ -16,7 +15,6 @@ const GOLD_MIST = '#F6F1E4';
 const IVORY = '#FAF7EF';
 const INK = '#16211E';
 const INK_MUTED = '#5C6B66';
-const PINE_SOFT = '#DDE8E3';
 
 /// Card width used for exports, in CSS pixels before the pixel-ratio scale.
 export const CARD_WIDTH = 520;
@@ -66,7 +64,7 @@ export function drawSheet(canvas, card, scale = 3) {
   ctx.font = '400 12px Almarai, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(
-    'إدارة القوى البشرية · وثيقة هوية رقمية معتمدة وموثقة بيومترياً',
+    'إدارة القوى البشرية · وثيقة معتمدة',
     SHEET_WIDTH / 2,
     SHEET_HEIGHT - MARGIN + 6,
   );
@@ -127,43 +125,27 @@ function drawFront(ctx, card, x, y, w, h) {
   ctx.fillStyle = GOLD_GLOW;
   ctx.font = `700 ${w * 0.018}px Almarai, sans-serif`;
   ctx.fillText(
-    'رحلة حياة المنتسب · الهوية الرقمية',
+    'رحلة حياة المنتسب',
     x + w - pad - logoSize - w * 0.022,
     headerY + logoSize * 0.88,
   );
 
-  drawChip(ctx, x + pad, headerY, w, card.hasBiometric ? 'بصمة موثقة' : 'موثّقة');
+  drawChip(ctx, x + pad, headerY, w, 'موثّقة');
 
-  // Portrait frame.
-  const photoW = w * 0.22;
-  const photoH = h * 0.46;
-  const photoX = x + w - pad - photoW;
-  const photoY = y + h * 0.30;
-  ctx.fillStyle = GOLD;
-  roundedRect(ctx, photoX, photoY, photoW, photoH, w * 0.048);
-  ctx.fill();
-  ctx.fillStyle = PINE_SOFT;
-  const inset = photoW * 0.045;
-  roundedRect(
-    ctx, photoX + inset, photoY + inset,
-    photoW - inset * 2, photoH - inset * 2, w * 0.03,
-  );
-  ctx.fill();
-  drawPersonGlyph(ctx, photoX + photoW / 2, photoY + photoH / 2, photoW * 0.34);
-
-  // Name block.
-  const textRight = photoX - w * 0.04;
+  // Name block — the card carries no portrait, so the text runs the full width.
+  const baseline = y + h * 0.30 + h * 0.46 * 0.58;
+  const textRight = x + w - pad;
   ctx.textAlign = 'right';
   ctx.fillStyle = '#FFFFFF';
   ctx.font = `800 ${w * 0.046}px Almarai, sans-serif`;
-  ctx.fillText(card.fullName, textRight, photoY + photoH * 0.58);
+  ctx.fillText(card.fullName, textRight, baseline);
 
   ctx.fillStyle = GOLD_GLOW;
   ctx.font = `700 ${w * 0.022}px Almarai, sans-serif`;
   ctx.fillText(
     `${card.academicYear}  ·  مواليد ${card.birthYear}`,
     textRight,
-    photoY + photoH * 0.58 + w * 0.038,
+    baseline + w * 0.038,
   );
 
   ctx.fillStyle = 'rgba(255,255,255,0.78)';
@@ -171,7 +153,7 @@ function drawFront(ctx, card, x, y, w, h) {
   ctx.fillText(
     `محافظة ${card.governorate}`,
     textRight,
-    photoY + photoH * 0.58 + w * 0.072,
+    baseline + w * 0.072,
   );
 
   // Footer: divider, captions, personal ID.
@@ -182,7 +164,7 @@ function drawFront(ctx, card, x, y, w, h) {
   ctx.font = `400 ${w * 0.016}px Almarai, sans-serif`;
   ctx.fillStyle = 'rgba(255,255,255,0.54)';
   ctx.textAlign = 'right';
-  ctx.fillText('الرقم الشخصي', x + w - pad, lineY + w * 0.038);
+  ctx.fillText('رقم الانتساب', x + w - pad, lineY + w * 0.038);
   ctx.textAlign = 'left';
   ctx.fillText(`صدرت في ${card.issuedAtLabel}`, x + pad, lineY + w * 0.038);
 
@@ -225,41 +207,14 @@ function drawBack(ctx, card, x, y, w, h) {
   roundedRect(ctx, x, y, w, h, radius);
   ctx.stroke();
 
-  // QR block on the leading (right in RTL is the text side)
-  const qrBoxW = w * 0.285;
-  const qrBoxX = x + pad;
-  const qrPad = w * 0.02;
-  const qrSize = w * 0.235;
-  const qrBoxH = qrSize + qrPad * 2 + w * 0.035;
-  const qrBoxY = y + (h - qrBoxH) / 2;
-
-  ctx.fillStyle = '#FFFFFF';
-  roundedRect(ctx, qrBoxX, qrBoxY, qrBoxW, qrBoxH, w * 0.028);
-  ctx.fill();
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 1.2;
-  roundedRect(ctx, qrBoxX, qrBoxY, qrBoxW, qrBoxH, w * 0.028);
-  ctx.stroke();
-
-  drawQr(ctx, card.link, qrBoxX + (qrBoxW - qrSize) / 2, qrBoxY + qrPad, qrSize);
-
-  ctx.fillStyle = GOLD_DEEP;
-  ctx.font = `700 ${w * 0.014}px Almarai, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.fillText(
-    'امسح للتحقق الفوري',
-    qrBoxX + qrBoxW / 2,
-    qrBoxY + qrPad + qrSize + w * 0.025,
-  );
-
-  // Details column.
+  // Details column — no QR block, so it spans the whole face.
   const colRight = x + w - pad;
-  const colWidth = w - pad * 2 - qrBoxW - w * 0.035;
+  const colWidth = w - pad * 2;
 
   ctx.textAlign = 'right';
   ctx.fillStyle = PINE;
   ctx.font = `800 ${w * 0.026}px Almarai, sans-serif`;
-  ctx.fillText('بيانات الهوية الرقمية', colRight, y + pad + w * 0.03);
+  ctx.fillText('بيانات البطاقة', colRight, y + pad + w * 0.03);
 
   ctx.fillStyle = GOLD_DEEP;
   ctx.font = `700 ${w * 0.019}px SpaceMono, monospace`;
@@ -274,7 +229,6 @@ function drawBack(ctx, card, x, y, w, h) {
     ['المحافظة', card.governorate],
     ['الطول', `${card.heightCm} سم`],
     ['الوزن', formatWeight(card.weightKg)],
-    ['البصمة البيومترية', card.biometricLabel],
   ];
   const cellW = colWidth / 3;
   const gridTop = y + h * 0.42;
@@ -318,23 +272,6 @@ function drawBack(ctx, card, x, y, w, h) {
 
 // ------------------------------------------------------------------ helpers
 
-function drawQr(ctx, text, x, y, size) {
-  const qr = encodeQr(text);
-  const module = size / qr.size;
-  ctx.save();
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(x, y, size, size);
-  ctx.fillStyle = '#000000';
-  for (let r = 0; r < qr.size; r++) {
-    for (let c = 0; c < qr.size; c++) {
-      if (!qr.modules[r][c]) continue;
-      // Overdraw by a hair so neighbouring modules never leave seams.
-      ctx.fillRect(x + c * module, y + r * module, module + 0.35, module + 0.35);
-    }
-  }
-  ctx.restore();
-}
-
 function drawLogo(ctx, x, y, size) {
   ctx.save();
   ctx.beginPath();
@@ -365,18 +302,6 @@ function drawChip(ctx, x, y, w, label) {
   ctx.fillText(label, x + width - padX, y + height * 0.68);
   ctx.beginPath();
   ctx.arc(x + padX * 0.8, y + height / 2, height * 0.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawPersonGlyph(ctx, cx, cy, size) {
-  ctx.save();
-  ctx.fillStyle = PINE;
-  ctx.beginPath();
-  ctx.arc(cx, cy - size * 0.35, size * 0.32, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(cx, cy + size * 0.55, size * 0.62, Math.PI, 0);
   ctx.fill();
   ctx.restore();
 }

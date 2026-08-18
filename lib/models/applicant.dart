@@ -5,12 +5,13 @@ import 'vision_test.dart';
 
 /// المرحلة الدراسية / المؤهل العلمي للمتقدّم.
 enum AcademicYear {
-  bachelor('إجازة جامعية (بكالوريوس)'),
-  diploma('دبلوم معهد تقاني'),
+  primary('ابتدائي'),
+  preparatory('اعدادي'),
+  secondary('ثانوي'),
+  university('جامعة'),
+  institute('معهد'),
   master('ماجستير'),
-  phd('دكتوراه'),
-  secondary('الشهادة الثانوية'),
-  other('أخرى');
+  phd('دكتوراه');
 
   const AcademicYear(this.label);
   final String label;
@@ -123,7 +124,7 @@ class Applicant {
   /// حدة إبصار العين اليسرى.
   final VisualAcuity leftEyeAcuity;
 
-  /// سجلّ التوثيق البيومتري: المسار المستخدم، ووقته، وجودته، وبصمة قالبه.
+  /// سجلّ تسجيل البصمة: المسار المستخدم، ووقته، وجودته، وبصمة قالبه.
   ///
   /// `null` يعني أن الخطوة لم تُنجز بعد — لا يوجد "توثيق افتراضي".
   final BiometricCapture? biometric;
@@ -172,10 +173,10 @@ class Applicant {
 
   bool get hasPhoto => photoPath != null && photoPath!.isNotEmpty;
 
-  /// هل أُنجز التوثيق البيومتري؟
+  /// هل أُنجزت البصمة؟
   bool get hasBiometric => biometric != null;
 
-  /// وصف مصدر التوثيق البيومتري، لرمز QR وشهادة PDF.
+  /// وصف مصدر تسجيل البصمة، لرمز QR وشهادة PDF.
   String get biometricSourceLabel => biometric?.method.label ?? 'غير موثّقة';
 
   /// حالة التوثيق كما تُطبع على البطاقة.

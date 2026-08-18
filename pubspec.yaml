@@ -45,6 +45,7 @@ flutter:
 
   assets:
     - assets/A.jpg
+    - assets/A_mark.png
 
   fonts:
     - family: Almarai

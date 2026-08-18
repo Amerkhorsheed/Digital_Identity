@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#17352F" />
     <meta name="robots" content="noindex" />
-    <title>إدارة القوى البشرية — التحقق من الهوية الرقمية</title>
+    <title>إدارة القوى البشرية — التحقق من البطاقة</title>
 
     <style>
       @font-face {
@@ -98,14 +98,6 @@
         letter-spacing: 1px;
         font-size: 13.5px;
       }
-      .badge.verified {
-        background: rgba(46, 125, 91, 0.1);
-        border-color: rgba(46, 125, 91, 0.4);
-        color: var(--success);
-        font-family: 'Almarai', sans-serif;
-        font-weight: 700;
-        font-size: 12.5px;
-      }
 
       h2.title { text-align: center; color: var(--pine); font-size: 24px; font-weight: 800; margin: 10px 0 6px; }
       p.lede { text-align: center; color: var(--ink-muted); line-height: 1.8; font-size: 14px; margin: 0 0 20px; }
@@ -188,14 +180,14 @@
       <img src="./assets/logo.jpg" alt="" />
       <div>
         <h1>إدارة القوى البشرية</h1>
-        <p>رحلة حياة المنتسب · الهوية الرقمية والتحقق الفوري</p>
+        <p>رحلة حياة المنتسب</p>
       </div>
     </header>
 
     <main>
       <section id="loading" class="state">
         <div class="spinner"></div>
-        <h2>جارٍ التحقق من الهوية الرقمية…</h2>
+        <h2>جارٍ التحقق من البطاقة…</h2>
         <p>يُفكّ الرمز داخل متصفحك بشكل آمن، دون إرسال بيانات إلى أي جهة خارجية.</p>
       </section>
 
@@ -207,10 +199,9 @@
       <section id="card" hidden>
         <div class="badge-wrap">
           <span class="badge" id="personalId"></span>
-          <span class="badge verified" id="bioBadge">✓ بصمة بيومترية موثقة</span>
         </div>
         <h2 class="title" id="fullName"></h2>
-        <p class="lede">هذه بطاقة الهوية الرقمية الرسمية. نزّلها كصورة PNG عالية الدقة أو مستند PDF رسمي.</p>
+        <p class="lede">هذه البطاقة الرسمية للمنتسب. نزّلها كصورة PNG عالية الدقة أو مستند PDF رسمي.</p>
 
         <div id="cardWrap"><canvas id="sheet"></canvas></div>
 
@@ -290,18 +281,6 @@
 
           $('personalId').textContent = card.personalId;
           $('fullName').textContent = card.fullName;
-          if (card.hasBiometric) {
-            $('bioBadge').style.display = 'inline-flex';
-            if (card.biometric) {
-              $('bioBadge').textContent = card.biometric.isHardwareMatch
-                ? '✓ بصمة بيومترية موثقة'
-                : '✓ بصمة إصبع ملتقطة';
-            } else {
-              $('bioBadge').textContent = '✓ بصمة بيومترية موثقة';
-            }
-          } else {
-            $('bioBadge').style.display = 'none';
-          }
 
           const visionText = card.rightEye === card.leftEye
             ? card.rightEye
@@ -316,7 +295,6 @@
             ['الطول', `${card.heightCm} سم`],
             ['الوزن', formatWeight(card.weightKg)],
             ['حدة الإبصار', visionText],
-            ['البصمة البيومترية', card.biometricLabel],
             ['مصدر قياس النظر', card.visionSource],
             ['تاريخ الإصدار', card.issuedAtLabel],
           ];

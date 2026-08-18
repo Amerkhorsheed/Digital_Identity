@@ -122,7 +122,7 @@ class _ADigitalIdAppState extends State<ADigitalIdApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: _navigatorKey,
-      title: 'الهوية الرقمية',
+      title: 'إدارة القوى البشرية',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       locale: const Locale('ar'),

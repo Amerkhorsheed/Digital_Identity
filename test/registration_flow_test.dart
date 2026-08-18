@@ -14,7 +14,7 @@ final _applicant = Applicant(
   turnNumber: 'A-001',
   fullName: 'سارة محمد المزيد',
   birthYear: 2001,
-  academicYear: AcademicYear.bachelor,
+  academicYear: AcademicYear.university,
   governorate: 'دمشق',
   heightCm: 165,
   weightKg: 58.5,
@@ -126,7 +126,7 @@ void main() {
     expect(find.text('الهوية الشخصية'), findsOneWidget);
     await _enterText(tester, 0, 'سارة محمد المزيد');
     await _enterText(tester, 1, '2001');
-    await _selectDropdown(tester, 'المرحلة الدراسية', 'إجازة جامعية (بكالوريوس)');
+    await _selectDropdown(tester, 'المرحلة الدراسية', 'جامعة');
     await _selectDropdown(tester, 'المحافظة', 'دمشق');
 
     await tester.tap(find.text('متابعة'));
@@ -155,10 +155,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // Step 3 — photo & biometric
-    expect(find.text('الصورة والبصمة البيومترية'), findsOneWidget);
+    expect(find.text('الصورة والبصمة'), findsOneWidget);
     expect(find.text('التقاط صورة'), findsOneWidget);
     expect(find.text('اختيار من المكتبة'), findsNothing);
-    expect(find.text('التوثيق البيومتري'), findsOneWidget);
+    expect(find.text('تسجيل البصمة'), findsOneWidget);
 
     // The device this test simulates has an enrolled sensor, so the signed
     // hardware match is offered alongside the pad.
@@ -217,7 +217,7 @@ void main() {
     expect(find.text('إظهار وجه البطاقة'), findsNothing);
     expect(find.byType(QrImageView), findsOneWidget);
     expect(find.text('بيانات الهوية'), findsOneWidget);
-    expect(find.text('تكبير رمز المسح'), findsOneWidget);
+    expect(find.text('تكبير رمز التحقق'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 3));
     expect(find.byType(QrImageView), findsOneWidget);
@@ -260,7 +260,13 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 900));
 
-    await tester.tap(find.text('بدء تسجيل جديد'));
+    // The success badge pulses forever, so the page never settles — the scroll
+    // has to be pumped out by hand rather than waited on.
+    final restart = find.text('بدء تسجيل جديد');
+    await tester.ensureVisible(restart);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(restart);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 

@@ -90,9 +90,11 @@ class _EyeTestPageState extends State<EyeTestPage> {
       return;
     }
 
-    // Move to next check with brief smooth mask
+    // Move to next check with brief smooth mask. Five checks run back to back,
+    // so every millisecond spent on the mask is paid five times over — it is
+    // kept just long enough to stop the next letter appearing mid-blink.
     setState(() => _masking = true);
-    Future.delayed(const Duration(milliseconds: 260), () {
+    Future.delayed(const Duration(milliseconds: 110), () {
       if (!mounted) return;
       setState(() {
         _currentIndex++;
@@ -168,7 +170,7 @@ class _EyeTestPageState extends State<EyeTestPage> {
       ),
       body: SafeArea(
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 160),
           child: switch (_stage) {
             _TestStage.intro => _buildIntro(),
             _TestStage.testing => _buildTesting(),
@@ -394,7 +396,7 @@ class _EyeTestPageState extends State<EyeTestPage> {
                 ],
               ),
               child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 180),
+                duration: const Duration(milliseconds: 90),
                 opacity: _masking ? 0.0 : 1.0,
                 child: TumblingE(
                   size: optotypeSize,

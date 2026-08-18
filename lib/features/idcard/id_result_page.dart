@@ -80,19 +80,18 @@ class _IdResultPageState extends State<IdResultPage>
     final size = MediaQuery.sizeOf(context);
     final base = switch (band) {
       ScreenBand.compact => 340.0,
-      ScreenBand.medium => 420.0,
-      ScreenBand.expanded => 460.0,
-      ScreenBand.television => 560.0,
+      ScreenBand.medium => 460.0,
+      ScreenBand.expanded => 520.0,
+      ScreenBand.television => 600.0,
     };
-    // The two faces sit flush against each other, so a side-by-side spread
-    // costs exactly two face widths. It is only worth it when each face still
-    // lands at a comfortable reading size; otherwise the spread stacks.
+    // Both faces always stack, on every screen. Sitting them side by side saved
+    // vertical space but cost each face half the width, and on a tablet the
+    // pair ran wider than the column that held them — so one face ended up
+    // tucked behind the other instead of beside it. Stacked, every face gets
+    // the full width at every size and nothing can hide anything else.
     final available =
         math.min(size.width - band.gutter * 2, band.contentWidth);
-    final sideBySide = band.isWide && available / 2 >= 330;
-    final cardWidth = sideBySide
-        ? math.min(base, available / 2).clamp(300.0, 620.0)
-        : math.min(base, available).clamp(240.0, 620.0);
+    final cardWidth = math.min(base, available).clamp(240.0, 620.0);
 
     return Scaffold(
       body: OrnamentBackground(
@@ -120,14 +119,20 @@ class _IdResultPageState extends State<IdResultPage>
                       _CardSpread(
                         reveal: _reveal,
                         cardWidth: cardWidth,
-                        sideBySide: sideBySide,
                         applicant: widget.applicant,
                         personalId: widget.personalId,
                         issuedAt: widget.issuedAt,
-                        qrData: _qrData,
                         onTap: _presentQr,
                       ),
-                      const SizedBox(height: 18),
+                      SizedBox(height: band.isCompact ? 20 : 24),
+                      _QrModule(
+                        reveal: _reveal,
+                        cardWidth: cardWidth,
+                        personalId: widget.personalId,
+                        qrData: _qrData,
+                        onPresent: _presentQr,
+                      ),
+                      const SizedBox(height: 14),
                       _SpreadControls(onPresent: _presentQr),
                       const SizedBox(height: 32),
                       Center(
@@ -198,7 +203,7 @@ class _SuccessHeader extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             issued
-                ? 'تم إصدار بطاقتك بنجاح. الوجهان الأمامي والخلفي معًا في بطاقة واحدة.'
+                ? 'تم إصدار بطاقتك بنجاح. الوجهان معًا في بطاقة واحدة، ورمز التحقق أسفلها.'
                 : 'تمت قراءة بيانات البطاقة ومعاينتها بنجاح.',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
@@ -232,7 +237,7 @@ class _IdBadge extends StatelessWidget {
             ScaffoldMessenger.of(context)
               ..clearSnackBars()
               ..showSnackBar(
-                const SnackBar(content: Text('تم نسخ الرقم الشخصي.')),
+                const SnackBar(content: Text('تم نسخ رقم الانتساب.')),
               );
           },
           child: Container(
@@ -356,30 +361,26 @@ class _SuccessBadgeState extends State<_SuccessBadge>
 /// The card, opened out.
 ///
 /// Both faces live inside a single shell — one radius, one gold edge, one
-/// shadow — joined by a gold fold seam instead of being flipped between. On a
-/// wide screen the two faces sit side by side like an open passport; otherwise
-/// they stack. The faces themselves are the untouched [IdCardView] /
+/// shadow — joined by a gold fold seam instead of being flipped between. They
+/// always stack, at every screen size, so neither face can ever end up behind
+/// the other. The faces themselves are the untouched [IdCardView] /
 /// [IdCardBack] artwork, so the card stays identical to the exported and web
 /// versions — only the way it is presented changed.
 class _CardSpread extends StatelessWidget {
   const _CardSpread({
     required this.reveal,
     required this.cardWidth,
-    required this.sideBySide,
     required this.applicant,
     required this.personalId,
     required this.issuedAt,
-    required this.qrData,
     required this.onTap,
   });
 
   final Animation<double> reveal;
   final double cardWidth;
-  final bool sideBySide;
   final Applicant applicant;
   final String personalId;
   final DateTime issuedAt;
-  final String qrData;
   final VoidCallback onTap;
 
   @override
@@ -396,25 +397,17 @@ class _CardSpread extends StatelessWidget {
       issuedAt: issuedAt,
       cardWidth: cardWidth,
       elevated: false,
-      corners: sideBySide
-          ? BorderRadiusDirectional.horizontal(start: radius)
-          : BorderRadius.vertical(top: radius),
+      corners: BorderRadius.vertical(top: radius),
     );
     final back = IdCardBack(
       applicant: applicant,
       personalId: personalId,
-      qrData: qrData,
       issuedAt: issuedAt,
       cardWidth: cardWidth,
       elevated: false,
       bordered: false,
-      corners: sideBySide
-          ? BorderRadiusDirectional.horizontal(end: radius)
-          : BorderRadius.vertical(bottom: radius),
+      corners: BorderRadius.vertical(bottom: radius),
     );
-
-    final spreadWidth = sideBySide ? cardWidth * 2 : cardWidth;
-    final spreadHeight = sideBySide ? height : height * 2;
 
     return Center(
       child: Semantics(
@@ -426,8 +419,8 @@ class _CardSpread extends StatelessWidget {
           child: _RevealTransition(
             reveal: reveal,
             child: SizedBox(
-              width: spreadWidth,
-              height: spreadHeight,
+              width: cardWidth,
+              height: height * 2,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: shell,
@@ -455,19 +448,15 @@ class _CardSpread extends StatelessWidget {
                   ),
                   child: Stack(
                     children: [
-                      if (sideBySide)
-                        Row(children: [front, back])
-                      else
-                        Column(children: [front, back]),
+                      Column(children: [front, back]),
                       Positioned.fill(
                         child: _FoldSeam(
                           reveal: reveal,
-                          vertical: sideBySide,
                           cardWidth: cardWidth,
                         ),
                       ),
                       Positioned.fill(
-                        child: _Sheen(reveal: reveal, width: spreadWidth),
+                        child: _Sheen(reveal: reveal, width: cardWidth),
                       ),
                     ],
                   ),
@@ -476,6 +465,57 @@ class _CardSpread extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The verification code, standing on its own under the card.
+///
+/// Keeping it off the card is what lets it be this big: the tile is sized for
+/// a camera at arm's length rather than for a corner of a printed face, and it
+/// arrives a beat after the card so the eye lands on the document first.
+class _QrModule extends StatelessWidget {
+  const _QrModule({
+    required this.reveal,
+    required this.cardWidth,
+    required this.personalId,
+    required this.qrData,
+    required this.onPresent,
+  });
+
+  final Animation<double> reveal;
+  final double cardWidth;
+  final String personalId;
+  final String qrData;
+  final VoidCallback onPresent;
+
+  @override
+  Widget build(BuildContext context) {
+    final rise = CurvedAnimation(
+      parent: reveal,
+      curve: const Interval(0.45, 1, curve: Curves.easeOutCubic),
+    );
+
+    return Center(
+      child: AnimatedBuilder(
+        animation: rise,
+        child: IdCardQrPanel(
+          personalId: personalId,
+          qrData: qrData,
+          cardWidth: cardWidth,
+          onTap: onPresent,
+        ),
+        builder: (context, child) {
+          final t = rise.value.clamp(0.0, 1.0);
+          return Opacity(
+            opacity: t,
+            child: Transform.translate(
+              offset: Offset(0, 18 * (1 - t)),
+              child: child,
+            ),
+          );
+        },
       ),
     );
   }
@@ -513,18 +553,12 @@ class _RevealTransition extends StatelessWidget {
 }
 
 /// The join between the two faces: a gold hairline that draws itself out from
-/// the middle, finished with the brand lozenge sitting astride the fold.
+/// the middle across the fold, finished with the brand lozenge sitting astride
+/// it.
 class _FoldSeam extends StatelessWidget {
-  const _FoldSeam({
-    required this.reveal,
-    required this.vertical,
-    required this.cardWidth,
-  });
+  const _FoldSeam({required this.reveal, required this.cardWidth});
 
   final Animation<double> reveal;
-
-  /// True when the faces are side by side and the seam runs top to bottom.
-  final bool vertical;
   final double cardWidth;
 
   @override
@@ -549,15 +583,14 @@ class _FoldSeam extends StatelessWidget {
           // The lozenge covers the middle of the rule, so the gold has to hold
           // its strength well out towards the edges or the seam disappears.
           final rule = Transform.scale(
-            scaleX: vertical ? 1 : grow,
-            scaleY: vertical ? grow : 1,
+            scaleX: grow,
             child: Container(
-              width: vertical ? 1.4 : double.infinity,
-              height: vertical ? double.infinity : 1.4,
+              width: double.infinity,
+              height: 1.4,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: vertical ? Alignment.topCenter : Alignment.centerLeft,
-                  end: vertical ? Alignment.bottomCenter : Alignment.centerRight,
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                   stops: const [0, 0.12, 0.88, 1],
                   colors: [
                     BrandColors.gold.withValues(alpha: 0.35),
@@ -575,8 +608,8 @@ class _FoldSeam extends StatelessWidget {
             children: [
               Center(
                 child: SizedBox(
-                  width: vertical ? markSize : double.infinity,
-                  height: vertical ? double.infinity : markSize,
+                  width: double.infinity,
+                  height: markSize,
                   child: Center(child: rule),
                 ),
               ),
@@ -668,9 +701,9 @@ class _Sheen extends StatelessWidget {
   }
 }
 
-/// Everything under the card. Nothing here switches faces — both are already
-/// on screen — so the only action left is blowing the QR up to scanning size,
-/// which is the one thing a spread cannot do on its own.
+/// Everything under the QR module. Nothing here switches faces — both are
+/// already on screen — so the only action left is blowing the code up to full
+/// screen, the one size a shared surface cannot hold on its own.
 class _SpreadControls extends StatelessWidget {
   const _SpreadControls({required this.onPresent});
 
@@ -683,11 +716,11 @@ class _SpreadControls extends StatelessWidget {
         TextButton.icon(
           onPressed: onPresent,
           icon: const Icon(Icons.fullscreen_rounded, size: 18),
-          label: const Text('تكبير رمز المسح'),
+          label: const Text('تكبير رمز التحقق'),
         ),
         const SizedBox(height: 2),
         Text(
-          'اضغط على البطاقة لتكبير رمز التحقق',
+          'اضغط على الرمز لعرضه بملء الشاشة عند التحقق',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: BrandColors.inkMuted,

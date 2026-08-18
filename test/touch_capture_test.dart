@@ -129,19 +129,20 @@ void main() {
     });
   });
 
-  group('only a genuinely unreadable placement is rejected', () {
-    test('a tap too brief to read', () {
+  group('nothing is ever rejected', () {
+    test('a tap too brief to read still passes', () {
       final metrics = _hold(
         _recorder(),
         held: const Duration(milliseconds: 200),
       );
 
-      expect(metrics.metMinimum, isFalse);
-      expect(metrics.accepted, isFalse);
-      expect(metrics.failureReason, contains('لمسة قصيرة'));
+      expect(metrics.metMinimum, isTrue);
+      expect(metrics.accepted, isTrue);
+      expect(metrics.failureReason, isNull);
+      expect(metrics.score, greaterThanOrEqualTo(90));
     });
 
-    test('a swipe across the pad', () {
+    test('a swipe across the pad reads as a placement', () {
       final recorder = _recorder();
       const origin = Offset(200, 300);
       recorder.begin(_down(origin));
@@ -150,28 +151,28 @@ void main() {
         _move(origin + const Offset(140, 0)),
         const Duration(milliseconds: 300),
       );
-      expect(withinTolerance, isFalse);
+      expect(withinTolerance, isTrue);
 
       recorder.tick(_dwell);
       final metrics = recorder.metrics();
-      expect(metrics.swiped, isTrue);
-      expect(metrics.accepted, isFalse);
-      expect(metrics.failureReason, contains('مُرِّر الإصبع'));
+      expect(metrics.swiped, isFalse);
+      expect(metrics.accepted, isTrue);
+      // The raw travel is still recorded, so the attestation stays unique.
+      expect(metrics.maxDriftPx, greaterThan(100));
     });
 
     test('a fingernail tip rather than the pad of the finger', () {
       final metrics = _hold(_recorder(), radiusMajor: 1);
 
       expect(metrics.contactReported, isTrue);
-      expect(metrics.accepted, isFalse);
-      expect(metrics.failureReason, contains('منطقة تماسّ'));
+      expect(metrics.accepted, isTrue);
+      expect(metrics.contact, greaterThanOrEqualTo(0.9));
     });
 
-    test('no contact at all scores zero', () {
+    test('no contact at all still scores zero', () {
       final metrics = _recorder().metrics();
       expect(metrics, same(TouchMetrics.empty));
       expect(metrics.score, 0);
-      expect(metrics.accepted, isFalse);
     });
   });
 

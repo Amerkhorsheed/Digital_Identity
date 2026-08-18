@@ -72,7 +72,7 @@ class _PhotoStepState extends State<PhotoStep> {
       hero: const StepHero(
         number: 3,
         icon: Icons.camera_alt_outlined,
-        title: 'الصورة والبصمة البيومترية',
+        title: 'الصورة والبصمة',
         subtitle: 'التقط صورتك الشخصية ثم امسح بصمتك على مستشعر الجهاز.',
       ),
       children: [

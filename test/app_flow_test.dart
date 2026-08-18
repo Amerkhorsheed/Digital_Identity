@@ -24,7 +24,7 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('الهوية الرقمية'), findsWidgets);
+    expect(find.text('إدارة القوى البشرية'), findsWidgets);
 
     await tester.pump(const Duration(milliseconds: 3600));
     await tester.pumpAndSettle();

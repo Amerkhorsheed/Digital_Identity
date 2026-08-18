@@ -41,7 +41,7 @@ void main() {
     final base = Applicant(
       fullName: 'سارة محمد المزيد',
       birthYear: 2001,
-      academicYear: AcademicYear.bachelor,
+      academicYear: AcademicYear.university,
       governorate: 'دمشق',
       heightCm: 165,
       weightKg: 58.5,

@@ -17,7 +17,7 @@ final _report = VisionTestReport.decoded(
 final _applicant = Applicant(
   fullName: 'سارة محمد الحلبي',
   birthYear: 2001,
-  academicYear: AcademicYear.bachelor,
+  academicYear: AcademicYear.university,
   governorate: 'ريف دمشق',
   heightCm: 165,
   weightKg: 58.5,
@@ -98,7 +98,7 @@ void main() {
     expect(card.issuedAt, _issuedAt);
     expect(card.applicant.fullName, 'سارة محمد الحلبي');
     expect(card.applicant.birthYear, 2001);
-    expect(card.applicant.academicYear, AcademicYear.bachelor);
+    expect(card.applicant.academicYear, AcademicYear.university);
     expect(card.applicant.governorate, 'ريف دمشق');
     expect(card.applicant.placeLabel, 'ريف دمشق');
     expect(card.applicant.heightCm, 165);

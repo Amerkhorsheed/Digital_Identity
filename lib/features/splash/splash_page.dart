@@ -125,7 +125,7 @@ class _SplashPageState extends State<SplashPage>
                         child: Column(
                           children: [
                             Text(
-                              'الهوية الرقمية',
+                              'إدارة القوى البشرية',
                               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w800,
@@ -163,7 +163,7 @@ class _SplashPageState extends State<SplashPage>
               right: 0,
               child: Center(
                 child: Text(
-                  '© ${DateTime.now().year} الهوية الرقمية · جميع الحقوق محفوظة',
+                  '© ${DateTime.now().year} إدارة القوى البشرية · جميع الحقوق محفوظة',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: Colors.white38,
                         letterSpacing: 0.5,

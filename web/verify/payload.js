@@ -10,13 +10,16 @@
 
 export const FORMAT_VERSION = 3;
 
+// Same order as AcademicYear in lib/models/applicant.dart — the payload
+// carries the enum index, so the two lists must not drift apart.
 const ACADEMIC_YEARS = [
-  'إجازة جامعية (بكالوريوس)',
-  'دبلوم معهد تقاني',
+  'ابتدائي',
+  'اعدادي',
+  'ثانوي',
+  'جامعة',
+  'معهد',
   'ماجستير',
   'دكتوراه',
-  'الشهادة الثانوية',
-  'أخرى',
 ];
 
 const BLOOD_TYPES = ['A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−'];
@@ -118,7 +121,7 @@ function toCard(map) {
   const hasBiometric = biometric !== null || (map.p !== undefined && map.p !== 0);
   const biometricLabel = biometric
     ? biometric.provenanceLabel
-    : (hasBiometric ? 'موثقة بيومترياً' : 'غير مسجلة');
+    : (hasBiometric ? 'موثقة بالبصمة' : 'غير مسجلة');
 
   return {
     personalId: map.i || '',

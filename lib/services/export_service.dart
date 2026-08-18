@@ -25,6 +25,14 @@ abstract final class ExportService {
   /// Width, in logical pixels, of the card used for exports.
   static const double exportCardWidth = 520;
 
+  /// The off-screen canvas the PNG is rendered onto.
+  ///
+  /// Pinned rather than inherited from the device: without it the capture is
+  /// constrained to whatever view the app happens to be running in, so a
+  /// narrow or short phone silently crops the sheet. Fixed here, the same
+  /// bytes come out of every handset.
+  static const Size exportSheetSize = Size(exportCardWidth + 72, 1030);
+
   /// Renders [IdCardSheet] offscreen and returns a high-resolution PNG file.
   ///
   /// Every image is decoded *before* the off-screen render starts, so nothing
@@ -54,6 +62,7 @@ abstract final class ExportService {
           images: images,
         ),
         pixelRatio: 3,
+        targetSize: exportSheetSize,
         delay: const Duration(milliseconds: 40),
       );
       final directory = await getTemporaryDirectory();
@@ -89,8 +98,8 @@ abstract final class ExportService {
     required DateTime issuedAt,
   }) async {
     final document = pw.Document(
-      title: 'شهادة الهوية الرقمية — $personalId',
-      author: 'الهوية الرقمية',
+      title: 'شهادة هوية المنتسب — $personalId',
+      author: 'إدارة القوى البشرية',
     );
     final palette = await _PdfPalette.create(
       await rootBundle.load('assets/A.jpg'),
@@ -128,7 +137,9 @@ abstract final class ExportService {
                 pw.SizedBox(height: 14),
                 _frontCard(palette, photo, applicant, personalId, issuedAt),
                 pw.SizedBox(height: 14),
-                _backCard(palette, qrImage, applicant, personalId, issuedAt),
+                _backCard(palette, applicant, personalId, issuedAt),
+                pw.SizedBox(height: 14),
+                _qrBlock(palette, qrImage, personalId),
                 pw.SizedBox(height: 14),
                 _footer(palette, personalId, issuedAt),
               ],
@@ -251,7 +262,7 @@ abstract final class ExportService {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(
-                  'الهوية الرقمية',
+                  'إدارة القوى البشرية',
                   style: pw.TextStyle(
                     color: PdfColors.white,
                     fontSize: 16,
@@ -331,7 +342,7 @@ abstract final class ExportService {
                       ),
                       pw.SizedBox(width: 10),
                       pw.Text(
-                        'الهوية الرقمية',
+                        'إدارة القوى البشرية',
                         style: pw.TextStyle(
                           color: PdfColors.white,
                           fontSize: 12,
@@ -433,7 +444,7 @@ abstract final class ExportService {
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text(
-                        'الرقم الشخصي',
+                        'رقم الانتساب',
                         style: pw.TextStyle(
                           color: p.white54,
                           fontSize: 7,
@@ -478,7 +489,6 @@ abstract final class ExportService {
 
   static pw.Widget _backCard(
     _PdfPalette p,
-    pw.ImageProvider qrImage,
     Applicant applicant,
     String personalId,
     DateTime issuedAt,
@@ -516,16 +526,6 @@ abstract final class ExportService {
       ),
       child: pw.Row(
         children: [
-          pw.Container(
-            padding: const pw.EdgeInsets.all(8),
-            decoration: pw.BoxDecoration(
-              color: PdfColors.white,
-              border: pw.Border.all(color: p.gold, width: 1.2),
-              borderRadius: pw.BorderRadius.circular(12),
-            ),
-            child: pw.Image(qrImage, width: 108, height: 108),
-          ),
-          pw.SizedBox(width: 18),
           pw.Expanded(
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -577,7 +577,7 @@ abstract final class ExportService {
                             ),
                           ),
                           pw.Text(
-                            'مصدر التوثيق البيومتري: '
+                            'مصدر تسجيل البصمة: '
                             '${applicant.biometricShortLabel}',
                             style: pw.TextStyle(
                               color: p.inkMuted,
@@ -598,6 +598,80 @@ abstract final class ExportService {
                       ),
                     ),
                   ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The verification code, given its own module below the data page.
+  ///
+  /// Printed at 130pt on white with a wide quiet zone, it is a code a phone
+  /// can read off the paper at arm's length — which a stamp in the corner of
+  /// the card never was.
+  static pw.Widget _qrBlock(
+    _PdfPalette p,
+    pw.ImageProvider qrImage,
+    String personalId,
+  ) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(18),
+      decoration: pw.BoxDecoration(
+        borderRadius: pw.BorderRadius.circular(18),
+        color: p.pine,
+        border: pw.Border.all(color: p.gold, width: 1.2),
+      ),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          pw.Container(
+            padding: const pw.EdgeInsets.all(9),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.white,
+              border: pw.Border.all(color: p.gold, width: 1.2),
+              borderRadius: pw.BorderRadius.circular(12),
+            ),
+            child: pw.Image(qrImage, width: 130, height: 130),
+          ),
+          pw.SizedBox(width: 20),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'رمز التحقق الرقمي',
+                  style: pw.TextStyle(
+                    color: PdfColors.white,
+                    fontSize: 14,
+                    font: p.bold,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Text(
+                  'امسح الرمز بكاميرا الهاتف للتحقق من صحة هذه الوثيقة '
+                  'ومطابقة بياناتها مع السجلّ المُصدر.',
+                  style: pw.TextStyle(
+                    color: p.white70,
+                    fontSize: 9,
+                    font: p.regular,
+                    lineSpacing: 3,
+                  ),
+                ),
+                pw.SizedBox(height: 12),
+                pw.Container(height: 1, color: p.gold.withAlpha(0.4)),
+                pw.SizedBox(height: 10),
+                pw.Text(
+                  personalId,
+                  style: pw.TextStyle(
+                    color: p.gold,
+                    fontSize: 12,
+                    font: p.monoBold,
+                    letterSpacing: 1.4,
+                  ),
                 ),
               ],
             ),
@@ -721,11 +795,13 @@ class _PngCardSheet extends StatelessWidget {
         child: Material(
           color: BrandColors.ivory,
           child: Container(
-            width: width + 72,
+            width: ExportService.exportSheetSize.width,
+            height: ExportService.exportSheetSize.height,
             padding: const EdgeInsets.fromLTRB(36, 36, 36, 30),
             decoration: const BoxDecoration(color: BrandColors.ivory),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 IdCardSheet(
@@ -738,7 +814,7 @@ class _PngCardSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 22),
                 Text(
-                  'الهوية الرقمية · وثيقة صادرة رقميًا وقابلة للتحقق',
+                  'إدارة القوى البشرية · وثيقة صادرة رقميًا وقابلة للتحقق',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: 'Almarai',

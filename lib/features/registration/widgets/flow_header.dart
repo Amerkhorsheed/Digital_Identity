@@ -137,7 +137,7 @@ class _BrandRow extends StatelessWidget {
                 ),
               ),
               Text(
-                'رحلة حياة المنتسب · الهوية الرقمية',
+                'رحلة حياة المنتسب',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.labelSmall?.copyWith(

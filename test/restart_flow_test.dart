@@ -140,7 +140,7 @@ void main() {
     // Step 1 — Identity
     await _enterText(tester, 0, 'سارة محمد الحلبي');
     await _enterText(tester, 1, '2001');
-    await _selectDropdown(tester, 'المرحلة الدراسية', 'إجازة جامعية (بكالوريوس)');
+    await _selectDropdown(tester, 'المرحلة الدراسية', 'جامعة');
     await _selectDropdown(tester, 'المحافظة', 'ريف دمشق');
     await _tapText(tester, 'متابعة');
 

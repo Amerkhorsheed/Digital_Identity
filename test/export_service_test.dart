@@ -10,7 +10,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 final _applicant = Applicant(
   fullName: 'Sara Almaziad',
   birthYear: 2001,
-  academicYear: AcademicYear.bachelor,
+  academicYear: AcademicYear.university,
   governorate: 'دمشق',
   heightCm: 165,
   weightKg: 58.5,
