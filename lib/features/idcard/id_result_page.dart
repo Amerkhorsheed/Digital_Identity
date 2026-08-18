@@ -191,7 +191,7 @@ class _SuccessHeader extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            issued ? 'بطاقة هويتك جاهزة' : 'تمت قراءة البطاقة',
+            issued ? 'بطاقتك جاهزة' : 'تمت قراءة البطاقة',
             textAlign: TextAlign.center,
             style: textTheme.headlineMedium?.copyWith(
               color: BrandColors.pine,

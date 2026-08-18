@@ -397,11 +397,11 @@ class _FingerprintPadPainter extends CustomPainter {
     // الطبقة الخافتة: النمط كاملًا، ليبدو السطح كبصمة لا كشكل فارغ.
     final dim = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
+      ..strokeWidth = 2.2
       ..strokeCap = StrokeCap.round
       ..isAntiAlias = true
       ..color = BrandColors.goldSoft
-          .withValues(alpha: stage == FingerprintPadStage.idle ? 0.12 : 0.16);
+          .withValues(alpha: stage == FingerprintPadStage.idle ? 0.22 : 0.28);
     for (final ridge in ridges) {
       canvas.drawPath(ridge, dim);
     }
@@ -417,7 +417,7 @@ class _FingerprintPadPainter extends CustomPainter {
       );
       final bright = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.9
+        ..strokeWidth = 2.6
         ..strokeCap = StrokeCap.round
         ..isAntiAlias = true
         ..shader = ui.Gradient.linear(
@@ -434,52 +434,46 @@ class _FingerprintPadPainter extends CustomPainter {
     canvas.restore();
   }
 
-  /// يبني مسارات الخطوط. النمط ثابت لبذرة معيّنة، فلا يرتجف بين الإطارات.
+  /// يبني مسارات الخطوط على النمط المعياري لرمز البصمة: أقواس متداخلة
+  /// مفتوحة من الأسفل، تتّسع فتحتها كلما ابتعد القوس عن المركز — وهو الشكل
+  /// الذي يعرفه الناس فورًا كبصمة. النمط ثابت لبذرة معيّنة فلا يرتجف بين
+  /// الإطارات.
   List<Path> _buildRidges(Offset core, Rect bounds) {
     final random = math.Random(seed);
     final paths = <Path>[];
-    final spacing = bounds.width * 0.052;
+    final spacing = bounds.width * 0.098;
 
-    // الخطوط تُقصّ عند الحدّ، فتُرسم أوسع من الإصبع كي تملأه حتى الحافة.
-    for (var i = 0; i < 26; i++) {
-      final baseRadius = spacing * (i + 1.1);
-      final phase = random.nextDouble() * math.pi * 2;
-      final wobble = 0.06 + random.nextDouble() * 0.07;
-      // فجوات تمثّل نهايات الخطوط وتشعّباتها.
-      final gapStart = random.nextDouble() * math.pi * 2;
-      final gapWidth = random.nextDouble() < 0.55
-          ? 0.25 + random.nextDouble() * 0.55
-          : 0.0;
+    // تشويه واحد مشترك: لو اختلف لكل قوس لتقاطعت الأقواس، وخطوط البصمة لا
+    // تتقاطع أبدًا.
+    final phase = random.nextDouble() * math.pi * 2;
+    const wobble = 0.045;
+
+    // الفتحة أسفل المركز (المحور y إلى الأسفل، فـ π/2 هو الأسفل).
+    const gapCenter = math.pi / 2;
+
+    for (var i = 0; i < 11; i++) {
+      final baseRadius = spacing * (i + 0.75);
+
+      // الأقواس الداخلية شبه مغلقة، والخارجية تنفتح تدريجيًا كما في الرمز
+      // المعياري، مع اختلاف طفيف لكل قوس فلا تصطفّ النهايات في خط واحد.
+      final opening = 0.20 + i * 0.085 + random.nextDouble() * 0.10;
+      final start = gapCenter + opening;
+      final sweep = math.pi * 2 - opening * 2;
 
       final path = Path();
-      var drawing = false;
-
-      const steps = 148;
-      for (var s = 0; s <= steps; s++) {
-        final theta = s / steps * math.pi * 2;
-
-        // داخل الفجوة يُرفع القلم فيبدو الخط منتهيًا لا مقطوعًا.
-        final delta = (theta - gapStart) % (math.pi * 2);
-        if (gapWidth > 0 && delta < gapWidth) {
-          drawing = false;
-          continue;
-        }
-
-        final r = baseRadius *
-            (1 +
-                wobble * math.sin(2 * theta + phase) +
-                wobble * 0.5 * math.sin(5 * theta + phase * 1.7));
+      const steps = 96;
+      for (var step = 0; step <= steps; step++) {
+        final theta = start + sweep * step / steps;
+        final r = baseRadius * (1 + wobble * math.sin(2 * theta + phase));
         // استطالة رأسية تتبع استطالة الإصبع نفسه.
         final point = Offset(
           core.dx + r * math.cos(theta),
-          core.dy + r * math.sin(theta) * 1.45,
+          core.dy + r * math.sin(theta) * 1.35,
         );
-
-        if (drawing) {
-          path.lineTo(point.dx, point.dy);
-        } else {
+        if (step == 0) {
           path.moveTo(point.dx, point.dy);
-          drawing = true;
+        } else {
+          path.lineTo(point.dx, point.dy);
         }
       }
       paths.add(path);
@@ -568,7 +562,7 @@ class _FingerprintPadPainter extends CustomPainter {
       final r = bounds.width * (0.12 + random.nextDouble() * 0.34);
       final at = Offset(
         core.dx + r * math.cos(theta),
-        core.dy + r * math.sin(theta) * 1.45,
+        core.dy + r * math.sin(theta) * 1.35,
       );
       canvas.drawCircle(at, 4.2, stroke);
       canvas.drawCircle(

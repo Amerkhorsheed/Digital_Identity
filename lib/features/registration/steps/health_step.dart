@@ -331,13 +331,29 @@ class _BloodTypePicker extends StatelessWidget {
                           gradient: BrandGradients.gold,
                           borderRadius: BorderRadius.circular(BrandRadii.pill),
                         ),
-                        child: Text(
-                          value!.label,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            fontFamily: 'SpaceMono',
-                            color: Colors.white,
+                        // '+O' is what RTL makes of 'O+', so the chip is set
+                        // left to right like the tiles it summarises.
+                        child: Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.water_drop_rounded,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                value!.label,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  fontFamily: 'SpaceMono',
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -443,40 +459,57 @@ class _BloodTile extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(BrandRadii.medium),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              // Blood groups are written left to right the world over — under
-              // the page's RTL direction the sign would jump ahead of the
-              // letter and read as '+A'.
-              child: Directionality(
-                textDirection: TextDirection.ltr,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      group,
-                      style: TextStyle(
-                        fontSize: 20,
-                        height: 1,
-                        fontWeight: FontWeight.w800,
-                        fontFamily: 'SpaceMono',
-                        color: selected ? Colors.white : BrandColors.pine,
-                      ),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // The drop names what the tile is about before the letters
+                  // are read, and fills in when the group is the chosen one.
+                  Icon(
+                    selected
+                        ? Icons.water_drop_rounded
+                        : Icons.water_drop_outlined,
+                    size: 17,
+                    color: selected
+                        ? BrandColors.goldGlow
+                        : BrandColors.goldDeep.withValues(alpha: 0.75),
+                  ),
+                  const SizedBox(height: 6),
+                  // Blood groups are written left to right the world over —
+                  // under the page's RTL direction the sign would jump ahead of
+                  // the letter and read as '+A'.
+                  Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          group,
+                          style: TextStyle(
+                            fontSize: 20,
+                            height: 1,
+                            fontWeight: FontWeight.w800,
+                            fontFamily: 'SpaceMono',
+                            color: selected ? Colors.white : BrandColors.pine,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          sign,
+                          style: TextStyle(
+                            fontSize: 15,
+                            height: 1.05,
+                            fontWeight: FontWeight.w800,
+                            color: selected
+                                ? BrandColors.goldGlow
+                                : BrandColors.goldDeep,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 2),
-                    Text(
-                      sign,
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.05,
-                        fontWeight: FontWeight.w800,
-                        color: selected
-                            ? BrandColors.goldGlow
-                            : BrandColors.goldDeep,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

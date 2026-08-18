@@ -26,7 +26,14 @@ export const SHEET_WIDTH = CARD_WIDTH + MARGIN * 2;
 export const SHEET_HEIGHT =
   MARGIN * 2 + CARD_WIDTH * 0.625 * 2 + GAP + FOOTER;
 
-let logoImage = null;
+let markImage = null;
+
+/// Tinted copies of the crest, keyed by fill colour.
+///
+/// `mark.png` is the eagle as a pure alpha mask on a white body — the same
+/// asset the app uses — so a colour is stamped through it with `source-in`
+/// once per colour and reused for every draw.
+const markCache = new Map();
 
 export async function loadAssets() {
   await document.fonts.load('400 16px Almarai');
@@ -34,12 +41,41 @@ export async function loadAssets() {
   await document.fonts.load('700 16px SpaceMono');
   await document.fonts.ready;
 
-  logoImage = await new Promise((resolve) => {
+  markImage = await new Promise((resolve) => {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
-    img.src = './assets/logo.jpg';
+    img.src = './assets/mark.png';
   });
+  markCache.clear();
+}
+
+function tintedMark(color) {
+  if (!markImage) return null;
+  const cached = markCache.get(color);
+  if (cached) return cached;
+
+  const off = document.createElement('canvas');
+  off.width = markImage.naturalWidth || markImage.width;
+  off.height = markImage.naturalHeight || markImage.height;
+  const octx = off.getContext('2d');
+  octx.drawImage(markImage, 0, 0);
+  octx.globalCompositeOperation = 'source-in';
+  octx.fillStyle = color;
+  octx.fillRect(0, 0, off.width, off.height);
+
+  markCache.set(color, off);
+  return off;
+}
+
+/// Prints the crest at [width], anchored by its top-left corner, at [alpha].
+function drawMark(ctx, color, alpha, x, y, width) {
+  const mark = tintedMark(color);
+  if (!mark) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(mark, x, y, width, (width * mark.height) / mark.width);
+  ctx.restore();
 }
 
 /// Draws both faces plus the footer line onto [canvas] at [scale]×.
@@ -88,24 +124,41 @@ function drawFront(ctx, card, x, y, w, h) {
   ctx.fillStyle = gradient;
   ctx.fillRect(x, y, w, h);
 
-  // Watermark and the soft gold disc, as on the app's card.
+  // The crest, printed large across the face and bleeding off the leading
+  // edge, over a soft gold glow — the same backdrop the app's card carries.
   ctx.save();
-  ctx.globalAlpha = 0.12;
-  ctx.fillStyle = GOLD;
-  ctx.font = `800 ${h * 1.35}px Almarai, sans-serif`;
-  ctx.direction = 'ltr';
-  ctx.textAlign = 'left';
-  ctx.fillText('A', x + w * 0.62, y + h * 1.28);
+  const glow = ctx.createRadialGradient(
+    x + w * 0.80, y + h * 0.32, 0,
+    x + w * 0.80, y + h * 0.32, h * 0.65,
+  );
+  glow.addColorStop(0, 'rgba(185,167,121,0.16)');
+  glow.addColorStop(1, 'rgba(185,167,121,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(x, y, w, h);
   ctx.restore();
 
+  // Leading edge is the right one: the card is set right to left.
+  drawMark(ctx, GOLD_GLOW, 0.20, x + w * 0.54, y + h * 0.05, w * 0.52);
+  drawMark(ctx, GOLD, 0.10, x - w * 0.29, y + h * 0.62, w * 0.40);
+
+  // A single diagonal light pass, so the surface reads as laminate.
   ctx.save();
-  ctx.globalAlpha = 0.06;
-  ctx.fillStyle = GOLD;
-  ctx.beginPath();
-  ctx.ellipse(
-    x + w * 0.135, y + h * 0.15, w * 0.275, h * 0.45, 0, 0, Math.PI * 2,
-  );
-  ctx.fill();
+  const sheen = ctx.createLinearGradient(x, y, x + w, y + h);
+  sheen.addColorStop(0, 'rgba(255,255,255,0.05)');
+  sheen.addColorStop(0.45, 'rgba(255,255,255,0)');
+  sheen.addColorStop(0.62, 'rgba(0,0,0,0.06)');
+  sheen.addColorStop(1, 'rgba(0,0,0,0.20)');
+  ctx.fillStyle = sheen;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+
+  // Hairline gold frame set in from the die cut.
+  ctx.save();
+  const inset = w * 0.018;
+  roundedRect(ctx, x + inset, y + inset, w - inset * 2, h - inset * 2, w * 0.032);
+  ctx.strokeStyle = 'rgba(185,167,121,0.30)';
+  ctx.lineWidth = 0.9;
+  ctx.stroke();
   ctx.restore();
 
   // Header row: logo, wordmark, verified chip.
@@ -192,13 +245,24 @@ function drawBack(ctx, card, x, y, w, h) {
   ctx.fillStyle = IVORY;
   ctx.fillRect(x, y, w, h);
 
+  const watermark = w * 0.62;
+  drawMark(
+    ctx, GOLD, 0.13,
+    x + (w - watermark) / 2,
+    y + h / 2 - (watermark * 374) / 499 / 2,
+    watermark,
+  );
+  drawMark(ctx, GOLD_DEEP, 0.07, x - w * 0.26, y + h * 0.62, w * 0.36);
+
   ctx.save();
-  ctx.globalAlpha = 0.1;
-  ctx.fillStyle = GOLD;
-  ctx.font = `800 ${h * 1.3}px Almarai, sans-serif`;
-  ctx.direction = 'ltr';
-  ctx.textAlign = 'left';
-  ctx.fillText('A', x - w * 0.12, y + h * 1.25);
+  const backInset = w * 0.018;
+  roundedRect(
+    ctx, x + backInset, y + backInset,
+    w - backInset * 2, h - backInset * 2, w * 0.032,
+  );
+  ctx.strokeStyle = 'rgba(185,167,121,0.28)';
+  ctx.lineWidth = 0.9;
+  ctx.stroke();
   ctx.restore();
   ctx.restore();
 
@@ -276,16 +340,20 @@ function drawLogo(ctx, x, y, size) {
   ctx.save();
   ctx.beginPath();
   ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
-  ctx.fillStyle = '#FFFFFF';
+  ctx.fillStyle = PINE_DEEP;
   ctx.fill();
-  if (logoImage) {
-    ctx.clip();
-    const inset = size * 0.14;
-    ctx.drawImage(
-      logoImage, x + inset, y + inset, size - inset * 2, size - inset * 2,
-    );
-  }
+  ctx.strokeStyle = 'rgba(185,167,121,0.75)';
+  ctx.lineWidth = size * 0.045;
+  ctx.stroke();
   ctx.restore();
+
+  const crest = size * 0.66;
+  drawMark(
+    ctx, GOLD_GLOW, 1,
+    x + (size - crest) / 2,
+    y + size / 2 - (crest * 374) / 499 / 2,
+    crest,
+  );
 }
 
 function drawChip(ctx, x, y, w, label) {

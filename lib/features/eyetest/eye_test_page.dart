@@ -420,41 +420,71 @@ class _EyeTestPageState extends State<EyeTestPage> {
                   color: BrandColors.ink,
                 ),
               ),
-              const SizedBox(height: 16),
-              // D-Pad Arrows
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260),
-                child: Column(
-                  children: [
-                    _buildDirectionButton(
-                      direction: EDirection.up,
-                      icon: Icons.keyboard_arrow_up_rounded,
-                      label: 'أعلى',
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildDirectionButton(
-                          direction: EDirection.right,
-                          icon: Icons.keyboard_arrow_right_rounded,
-                          label: 'يمين',
-                        ),
-                        const SizedBox(width: 48),
-                        _buildDirectionButton(
-                          direction: EDirection.left,
-                          icon: Icons.keyboard_arrow_left_rounded,
-                          label: 'يسار',
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    _buildDirectionButton(
-                      direction: EDirection.down,
-                      icon: Icons.keyboard_arrow_down_rounded,
-                      label: 'أسفل',
-                    ),
-                  ],
+              const SizedBox(height: 18),
+              // The four keys sit on a recessed ivory plate, which is what
+              // makes them read as one pad rather than four loose buttons. The
+              // keys keep their true screen positions — the left key is on the
+              // left — so the answer maps to the gap the eye just saw, which is
+              // why the plate is laid out ignoring the page's RTL direction.
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: BrandColors.goldMist,
+                    borderRadius: BorderRadius.circular(BrandRadii.extraLarge),
+                    border: Border.all(color: BrandColors.goldSoft, width: 1.2),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildDirectionButton(
+                        direction: EDirection.up,
+                        icon: Icons.keyboard_arrow_up_rounded,
+                        label: 'أعلى',
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildDirectionButton(
+                            direction: EDirection.left,
+                            icon: Icons.keyboard_arrow_left_rounded,
+                            label: 'يسار',
+                          ),
+                          const SizedBox(width: 12),
+                          // The dead centre of the pad, left empty so the four
+                          // arms read as a compass rose.
+                          Container(
+                            width: 78,
+                            height: 78,
+                            alignment: Alignment.center,
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color:
+                                    BrandColors.gold.withValues(alpha: 0.45),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          _buildDirectionButton(
+                            direction: EDirection.right,
+                            icon: Icons.keyboard_arrow_right_rounded,
+                            label: 'يمين',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildDirectionButton(
+                        direction: EDirection.down,
+                        icon: Icons.keyboard_arrow_down_rounded,
+                        label: 'أسفل',
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -464,39 +494,67 @@ class _EyeTestPageState extends State<EyeTestPage> {
     );
   }
 
+  /// One arm of the direction pad.
+  ///
+  /// The four keys read as a single pine control rather than four separate
+  /// cards: a round, solid key with the arrow set large in gold. At this point
+  /// the person is squinting at a letter, so the target is big, the contrast is
+  /// high, and the word under it is there for confirmation rather than for
+  /// reading. The [label] stays in the tree — the pad has to be usable by touch
+  /// and by screen reader alike.
   Widget _buildDirectionButton({
     required EDirection direction,
     required IconData icon,
     required String label,
   }) {
-    return Material(
-      color: BrandColors.surface,
-      elevation: 2,
-      shadowColor: BrandColors.pine.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: () => _handleAnswer(direction),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          width: 72,
-          height: 64,
+    const size = 78.0;
+
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: BrandColors.outlineSoft, width: 1.3),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 30, color: BrandColors.pine),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: BrandColors.ink,
-                ),
+            shape: BoxShape.circle,
+            gradient: BrandGradients.pine,
+            border: Border.all(
+              color: BrandColors.gold.withValues(alpha: 0.55),
+              width: 1.4,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: BrandColors.pine.withValues(alpha: 0.28),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
               ),
             ],
+          ),
+          child: InkWell(
+            onTap: () => _handleAnswer(direction),
+            customBorder: const CircleBorder(),
+            splashColor: BrandColors.gold.withValues(alpha: 0.30),
+            highlightColor: BrandColors.gold.withValues(alpha: 0.14),
+            child: SizedBox.square(
+              dimension: size,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 38, color: BrandColors.goldGlow),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

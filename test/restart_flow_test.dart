@@ -174,7 +174,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 900));
     expect(find.byType(IdResultPage), findsOneWidget);
-    expect(find.text('بطاقة هويتك جاهزة'), findsOneWidget);
+    expect(find.text('بطاقتك جاهزة'), findsOneWidget);
 
     await tester.ensureVisible(find.text('بدء تسجيل جديد'));
     await tester.pump();

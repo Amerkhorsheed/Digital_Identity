@@ -204,7 +204,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump(const Duration(milliseconds: 1000));
 
-    expect(find.text('بطاقة هويتك جاهزة'), findsOneWidget);
+    expect(find.text('بطاقتك جاهزة'), findsOneWidget);
     expect(find.textContaining('A-260816-TEST12'), findsWidgets);
     expect(find.text('تنزيل صورة PNG'), findsNothing);
     expect(find.text('تنزيل مستند PDF'), findsNothing);
